@@ -1,0 +1,147 @@
+/*
+ * Copyright 2016 by floragunn UG (haftungsbeschränkt) - All rights reserved
+ * 
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed here is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * 
+ * This software is free of charge for non-commercial and academic use. 
+ * For commercial use in a production environment you have to obtain a license 
+ * from https://floragunn.com
+ * 
+ */
+
+package com.floragunn.dlic.auth.ldap.backend;
+
+import java.util.List;
+
+import org.elasticsearch.ElasticsearchSecurityException;
+import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.common.logging.Loggers;
+import org.elasticsearch.common.settings.Settings;
+import org.ldaptive.BindRequest;
+import org.ldaptive.Connection;
+import org.ldaptive.Credential;
+import org.ldaptive.LdapEntry;
+import org.ldaptive.LdapException;
+import org.ldaptive.Response;
+import org.ldaptive.ResultCode;
+import org.ldaptive.SearchScope;
+
+import com.floragunn.dlic.auth.ldap.LdapUser;
+import com.floragunn.dlic.auth.ldap.util.ConfigConstants;
+import com.floragunn.dlic.auth.ldap.util.LdapHelper;
+import com.floragunn.dlic.auth.ldap.util.Utils;
+import com.floragunn.searchguard.auth.AuthenticationBackend;
+import com.floragunn.searchguard.user.AuthCredentials;
+import com.floragunn.searchguard.user.User;
+
+public class LDAPAuthenticationBackend implements AuthenticationBackend {
+
+    static {
+        Utils.printLicenseInfo();
+    }
+
+    protected final ESLogger log = Loggers.getLogger(this.getClass());
+    private final Settings settings;
+
+    public LDAPAuthenticationBackend(final Settings settings) {
+        this.settings = settings;
+    }
+
+    @Override
+    public User authenticate(final AuthCredentials authCreds) throws ElasticsearchSecurityException {
+
+        Connection ldapConnection = null;
+        final String user = authCreds.getUsername();
+
+        final byte[] password = authCreds.getPassword();
+
+        try {
+
+            ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
+
+            final List<LdapEntry> result = LdapHelper.search(ldapConnection,
+                    settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, ""),
+                    settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}", user),
+                    SearchScope.SUBTREE);
+
+            if (result.isEmpty()) {
+                throw new ElasticsearchSecurityException("No user " + user + " found");
+            }
+
+            if (result.size() > 1) {
+                throw new ElasticsearchSecurityException("More than one user found");
+            }
+
+            final LdapEntry entry = result.get(0);
+            final String dn = entry.getDn();
+
+            log.trace("Try to authenticate dn {}", dn);
+
+            final BindRequest br = new BindRequest(dn, new Credential(password));
+
+            final Response<Void> res = ldapConnection.reopen(br);
+            if (res.getResultCode() != ResultCode.SUCCESS) {
+                throw new LdapException("unable to bind with " + dn + ", result was " + res.getResultCode());
+            }
+
+            final String usernameAttribute = settings.get(ConfigConstants.LDAP_AUTHC_USERNAME_ATTRIBUTE, null);
+            String username = dn;
+
+            if (usernameAttribute != null && entry.getAttribute(usernameAttribute) != null) {
+                username = entry.getAttribute(usernameAttribute).getStringValue();
+            }
+
+            log.debug("Authenticated username {}", username);
+
+            return new LdapUser(username, entry);
+
+        } catch (final Exception e) {
+            log.error(e.toString(), e);
+            throw new ElasticsearchSecurityException(e.toString(), e);
+        } finally {
+            Utils.unbindAndCloseSilently(ldapConnection);
+        }
+
+    }
+
+    @Override
+    public String getType() {
+        return "ldap";
+    }
+
+    @Override
+    public boolean exists(final User user) {
+        Connection ldapConnection = null;
+
+        try {
+
+            ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
+
+            final List<LdapEntry> result = LdapHelper.search(
+                    ldapConnection,
+                    settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, ""),
+                    settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}",
+                            user.getName()), SearchScope.SUBTREE);
+
+            if (result.isEmpty()) {
+                throw new ElasticsearchSecurityException("No user " + user + " found");
+            }
+
+            if (result.size() > 1) {
+                throw new ElasticsearchSecurityException("More than one user for '" + user + "' found");
+            }
+
+        } catch (final Exception e) {
+            log.error(e.toString(), e);
+            return false;
+        } finally {
+            Utils.unbindAndCloseSilently(ldapConnection);
+        }
+
+        return true;
+    }
+
+}
