@@ -18,11 +18,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.security.AccessController;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivilegedAction;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,9 +35,9 @@ import java.util.Set;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
-import javax.net.ssl.TrustManagerFactory;
 
 import org.elasticsearch.ElasticsearchSecurityException;
+import org.elasticsearch.SpecialPermission;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.logging.ESLogger;
@@ -54,11 +54,8 @@ import org.ldaptive.LdapEntry;
 import org.ldaptive.LdapException;
 import org.ldaptive.SearchScope;
 import org.ldaptive.ssl.AllowAnyHostnameVerifier;
-import org.ldaptive.ssl.AllowAnyTrustManager;
 import org.ldaptive.ssl.CredentialConfig;
 import org.ldaptive.ssl.CredentialConfigFactory;
-import org.ldaptive.ssl.DefaultHostnameVerifier;
-import org.ldaptive.ssl.DefaultTrustManager;
 import org.ldaptive.ssl.HostnameVerifyingTrustManager;
 import org.ldaptive.ssl.SslConfig;
 
@@ -122,19 +119,38 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     log.debug("bindDn {}", bindDn);
                 }
 
-                if (bindDn != null) {
-                    final BindRequest br = new BindRequest(bindDn, new Credential(settings.get(
-                            ConfigConstants.LDAP_PASSWORD, null)));
-                    connection.open(br);
-                } else {
-                    connection.open();
+                final Connection _connection = connection;
+                
+                
+                final SecurityManager sm = System.getSecurityManager();
+
+                if (sm != null) {
+                    sm.checkPermission(new SpecialPermission());
                 }
+                
+                AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
+                    public Object run() {
+                        try {
+                            if (bindDn != null) {
+                                final BindRequest br = new BindRequest(bindDn, new Credential(settings.get(
+                                        ConfigConstants.LDAP_PASSWORD, null)));
+                                _connection.open(br);
+                            } else {
+                                _connection.open();
+                            }
+                        } catch (LdapException e) {
+                            log.warn("Unable to connect to ldapserver {} due to {}. Try next.", e, config.getLdapUrl(), e.toString());
+                        }
+                        return null;
+                    }
+                });
 
                 if (connection != null && connection.isOpen()) {
                     break;
                 }
             } catch (final Exception e) {
-                log.warn("Unable to connect to ldapserver {} due to {}. Try next.", ldapHosts[i], e.toString());
+                log.warn("Unable to connect to ldapserver {} due to {}. Try next.", e, ldapHosts[i], e.toString());
                 e.printStackTrace();
                 Utils.unbindAndCloseSilently(connection);
                 continue;
