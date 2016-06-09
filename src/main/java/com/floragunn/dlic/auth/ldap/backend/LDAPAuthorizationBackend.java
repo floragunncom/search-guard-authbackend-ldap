@@ -22,7 +22,8 @@ import java.security.AccessController;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -80,8 +81,29 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     public LDAPAuthorizationBackend(final Settings settings) {
         this.settings = settings;
     }
+    
+    public static Connection getConnection(final Settings settings) throws Exception {
+        
+        final SecurityManager sm = System.getSecurityManager();
 
-    public static Connection getConnection(final Settings settings) throws KeyStoreException, NoSuchAlgorithmException,
+        if (sm != null) {
+            sm.checkPermission(new SpecialPermission());
+        }
+        
+        try {
+            return AccessController.doPrivileged(new PrivilegedExceptionAction<Connection>() {
+                @Override
+                public Connection run() throws Exception {
+                    return getConnection0(settings);
+                }
+            });
+        } catch (PrivilegedActionException e) {
+            throw e.getException();
+        }
+
+    }
+
+    private static Connection getConnection0(final Settings settings) throws KeyStoreException, NoSuchAlgorithmException,
     CertificateException, FileNotFoundException, IOException, LdapException {
         final boolean enableSSL = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL, false);
 
@@ -118,33 +140,14 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 if (log.isDebugEnabled()) {
                     log.debug("bindDn {}", bindDn);
                 }
-
-                final Connection _connection = connection;
                 
-                
-                final SecurityManager sm = System.getSecurityManager();
-
-                if (sm != null) {
-                    sm.checkPermission(new SpecialPermission());
+                if (bindDn != null) {
+                    final BindRequest br = new BindRequest(bindDn, new Credential(settings.get(
+                            ConfigConstants.LDAP_PASSWORD, null)));
+                    connection.open(br);
+                } else {
+                    connection.open();
                 }
-                
-                AccessController.doPrivileged(new PrivilegedAction<Object>() {
-                    @Override
-                    public Object run() {
-                        try {
-                            if (bindDn != null) {
-                                final BindRequest br = new BindRequest(bindDn, new Credential(settings.get(
-                                        ConfigConstants.LDAP_PASSWORD, null)));
-                                _connection.open(br);
-                            } else {
-                                _connection.open();
-                            }
-                        } catch (LdapException e) {
-                            log.warn("Unable to connect to ldapserver {} due to {}. Try next.", e, config.getLdapUrl(), e.toString());
-                        }
-                        return null;
-                    }
-                });
 
                 if (connection != null && connection.isOpen()) {
                     break;

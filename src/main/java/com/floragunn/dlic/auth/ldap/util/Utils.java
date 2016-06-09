@@ -14,6 +14,11 @@
 
 package com.floragunn.dlic.auth.ldap.util;
 
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+
+import org.elasticsearch.SpecialPermission;
 import org.ldaptive.Connection;
 
 public class Utils {
@@ -22,13 +27,24 @@ public class Utils {
         if (connection == null) {
             return;
         }
+        
+        final SecurityManager sm = System.getSecurityManager();
 
-        try {
-            connection.close();
-        } catch (final Exception e) {
-            // ignore
+        if (sm != null) {
+            sm.checkPermission(new SpecialPermission());
         }
 
+        try {
+             AccessController.doPrivileged(new PrivilegedExceptionAction<Object>() {
+                @Override
+                public Object run() throws Exception {
+                    connection.close();
+                    return null;
+                }
+            });
+        } catch (PrivilegedActionException e) {
+         // ignore
+        }
     }
 
     public static void printLicenseInfo() {

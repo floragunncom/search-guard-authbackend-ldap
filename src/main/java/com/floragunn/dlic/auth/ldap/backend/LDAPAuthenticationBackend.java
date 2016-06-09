@@ -14,9 +14,13 @@
 
 package com.floragunn.dlic.auth.ldap.backend;
 
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
 import org.elasticsearch.ElasticsearchSecurityException;
+import org.elasticsearch.SpecialPermission;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
 import org.elasticsearch.common.settings.Settings;
@@ -82,9 +86,29 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
 
             final BindRequest br = new BindRequest(dn, new Credential(password));
 
-            final Response<Void> res = ldapConnection.reopen(br);
-            if (res.getResultCode() != ResultCode.SUCCESS) {
-                throw new LdapException("unable to bind with " + dn + ", result was " + res.getResultCode());
+            
+            final SecurityManager sm = System.getSecurityManager();
+
+            if (sm != null) {
+                sm.checkPermission(new SpecialPermission());
+            }
+            
+            final Connection _con = ldapConnection;
+            Response<Void> res;
+            
+            try {
+                res =  AccessController.doPrivileged(new PrivilegedExceptionAction<Response<Void>>() {
+                    @Override
+                    public Response<Void> run() throws LdapException {
+                        return _con.reopen(br);
+                    }
+                });
+            } catch (PrivilegedActionException e) {
+                throw e.getException();
+            }            
+            
+            if (res == null || res.getResultCode() != ResultCode.SUCCESS) {
+                throw new LdapException("unable to bind with " + dn + ", result was " + (res==null?"null":String.valueOf(res.getResultCode())));
             }
 
             final String usernameAttribute = settings.get(ConfigConstants.LDAP_AUTHC_USERNAME_ATTRIBUTE, null);
