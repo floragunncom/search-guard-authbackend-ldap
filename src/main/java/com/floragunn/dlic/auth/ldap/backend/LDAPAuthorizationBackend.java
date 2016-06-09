@@ -217,7 +217,8 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             if(!verifyHostnames) {
                 sslConfig.setTrustManagers(new HostnameVerifyingTrustManager(new AllowAnyHostnameVerifier(), "dummy"));
             }
-            
+
+            sslConfig.setEnabledProtocols(new String[] { "TLSv1.1", "TLSv1.2" });
             config.setSslConfig(sslConfig);
         }
 
