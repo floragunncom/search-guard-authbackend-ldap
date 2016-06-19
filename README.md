@@ -5,6 +5,10 @@
 ## About this module
 This module for [Search Guard 2](https://github.com/floragunncom/search-guard) enables LDAP and Windows Active Directory Authentication an Authorization.
 
+## Downloads
+
+You can [Download Version 1 for Search Guard 2.3.3.1 here](http://oss.sonatype.org/service/local/artifact/maven/content?c=jar-with-dependencies&r=releases&g=com.floragunn&a=dlic-search-guard-authbackend-ldap&v=2.3.3.1).
+
 ## Commercial use
 This software is free of charge for non-commercial and academic use. For commercial use in a production environment you have to obtain a license [here](https://floragunn.com/searchguard/searchguard-license-support/) 
 
