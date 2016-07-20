@@ -136,18 +136,23 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 connection = connFactory.getConnection();
                 
                 final String bindDn = settings.get(ConfigConstants.LDAP_BIND_DN, null);
+                final String password = settings.get(ConfigConstants.LDAP_PASSWORD, null);
 
                 if (log.isDebugEnabled()) {
-                    log.debug("bindDn {}", bindDn);
+                    log.debug("bindDn {}, password {}", bindDn, password != null && password.length() > 0?"****":"<not set>");
                 }
                 
-                if (bindDn != null) {
-                    final BindRequest br = new BindRequest(bindDn, new Credential(settings.get(
-                            ConfigConstants.LDAP_PASSWORD, null)));
-                    connection.open(br);
-                } else {
-                    connection.open();
+                if (bindDn != null && (password == null || password.length() == 0)) {
+                    log.error("No password given for bind_dn {}. Will try to authenticate anonymously to ldap", bindDn);
                 }
+                
+                BindRequest br = new BindRequest();
+                
+                if (bindDn != null && password != null && password.length() > 0) {
+                    br = new BindRequest(bindDn, new Credential(password));
+                }
+                
+                connection.open(br);
 
                 if (connection != null && connection.isOpen()) {
                     break;

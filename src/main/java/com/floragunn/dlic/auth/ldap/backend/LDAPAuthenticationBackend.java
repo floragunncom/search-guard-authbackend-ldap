@@ -105,10 +105,6 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                 });
             } catch (PrivilegedActionException e) {
                 throw e.getException();
-            }            
-            
-            if (res == null || res.getResultCode() != ResultCode.SUCCESS) {
-                throw new LdapException("unable to bind with " + dn + ", result was " + (res==null?"null":String.valueOf(res.getResultCode())));
             }
 
             final String usernameAttribute = settings.get(ConfigConstants.LDAP_AUTHC_USERNAME_ATTRIBUTE, null);
