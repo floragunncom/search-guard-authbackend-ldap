@@ -77,6 +77,22 @@ public class LdapBackendTest {
         Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
     }
     
+    @Test(expected=ElasticsearchSecurityException.class)
+    public void testLdapInjection() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})").build();
+
+        String injectString = "*jack*";
+
+        
+        final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials(injectString, "secret"
+                .getBytes(StandardCharsets.UTF_8)));
+    }
+    
     @Test
     public void testLdapAuthenticationBindDn() throws Exception {
 

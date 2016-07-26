@@ -17,6 +17,7 @@ package com.floragunn.dlic.auth.ldap.backend;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
 import java.util.List;
 
 import org.elasticsearch.ElasticsearchSecurityException;
@@ -30,7 +31,6 @@ import org.ldaptive.Credential;
 import org.ldaptive.LdapEntry;
 import org.ldaptive.LdapException;
 import org.ldaptive.Response;
-import org.ldaptive.ResultCode;
 import org.ldaptive.SearchScope;
 
 import com.floragunn.dlic.auth.ldap.LdapUser;
@@ -53,14 +53,14 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     public LDAPAuthenticationBackend(final Settings settings) {
         this.settings = settings;
     }
+    
 
     @Override
     public User authenticate(final AuthCredentials authCreds) throws ElasticsearchSecurityException {
 
         Connection ldapConnection = null;
-        final String user = authCreds.getUsername();
-
-        final byte[] password = authCreds.getPassword();
+        final String user = Utils.escapeStringRfc2254(authCreds.getUsername());
+        byte[] password = authCreds.getPassword();
 
         try {
 
@@ -94,10 +94,9 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
             }
             
             final Connection _con = ldapConnection;
-            Response<Void> res;
             
             try {
-                res =  AccessController.doPrivileged(new PrivilegedExceptionAction<Response<Void>>() {
+                AccessController.doPrivileged(new PrivilegedExceptionAction<Response<Void>>() {
                     @Override
                     public Response<Void> run() throws LdapException {
                         return _con.reopen(br);
@@ -122,6 +121,8 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
             log.error(e.toString(), e);
             throw new ElasticsearchSecurityException(e.toString(), e);
         } finally {
+            Arrays.fill(password, (byte) '\0');
+            password = null;
             Utils.unbindAndCloseSilently(ldapConnection);
         }
 
@@ -135,6 +136,8 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     @Override
     public boolean exists(final User user) {
         Connection ldapConnection = null;
+        
+        final String username = Utils.escapeStringRfc2254(user.getName());
 
         try {
 
@@ -144,14 +147,14 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                     ldapConnection,
                     settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, ""),
                     settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}",
-                            user.getName()), SearchScope.SUBTREE);
+                            username), SearchScope.SUBTREE);
 
             if (result.isEmpty()) {
-                throw new ElasticsearchSecurityException("No user " + user + " found");
+                throw new ElasticsearchSecurityException("No user " + username + " found");
             }
 
             if (result.size() > 1) {
-                throw new ElasticsearchSecurityException("More than one user for '" + user + "' found");
+                throw new ElasticsearchSecurityException("More than one user for '" + username + "' found");
             }
 
         } catch (final Exception e) {

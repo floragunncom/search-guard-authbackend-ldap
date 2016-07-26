@@ -240,7 +240,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     @Override
     public void fillRoles(final User user, final AuthCredentials optionalAuthCreds) throws ElasticsearchSecurityException {
 
-        final String authenticatedUser = user.getName();
+        final String authenticatedUser =  Utils.escapeStringRfc2254(user.getName());
 
         LdapEntry entry = null;
         String dn = null;

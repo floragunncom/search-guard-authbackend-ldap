@@ -17,12 +17,19 @@ package com.floragunn.dlic.auth.ldap.util;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.util.StringTokenizer;
 
 import org.elasticsearch.SpecialPermission;
 import org.ldaptive.Connection;
 
-public class Utils {
+public final class Utils {
 
+    private static final String RFC2254_ESCAPE_CHARS = "\\*()\000";
+    
+    private Utils() {
+        
+    }
+    
     public static void unbindAndCloseSilently(final Connection connection) {
         if (connection == null) {
             return;
@@ -46,6 +53,47 @@ public class Utils {
          // ignore
         }
     }
+    
+    /**
+     * RFC 2254 string escaping
+     */
+    public static String escapeStringRfc2254(final String str) {
+        
+        if(str == null || str.length() == 0) {
+            return str;
+        }
+        
+        final StringTokenizer tok = new StringTokenizer(str, RFC2254_ESCAPE_CHARS, true);
+
+        if (tok.countTokens() == 0) {    
+            return str;
+        }
+        
+        final StringBuilder out= new StringBuilder();
+        while (tok.hasMoreTokens()) {
+            final String s = tok.nextToken();
+            
+            if (s.equals("*")) {
+                out.append("\\2a");
+            }
+            else if (s.equals("(")) {
+                out.append("\\28");
+            }    
+            else if (s.equals(")")) {
+                out.append("\\29");
+            }    
+            else if (s.equals("\\")) {
+                out.append("\\5c");
+            }
+            else if (s.equals("\000")) {
+                out.append("\\00");
+            }
+            else {
+                out.append(s);
+            }
+        }
+        return out.toString();
+    }    
 
     public static void printLicenseInfo() {
         System.out.println("*************************************");
