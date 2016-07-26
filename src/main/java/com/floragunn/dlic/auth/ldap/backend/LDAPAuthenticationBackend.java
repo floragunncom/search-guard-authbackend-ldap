@@ -71,7 +71,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                     settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}", user),
                     SearchScope.SUBTREE);
 
-            if (result.isEmpty()) {
+            if (result == null || result.isEmpty()) {
                 throw new ElasticsearchSecurityException("No user " + user + " found");
             }
 
@@ -82,7 +82,9 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
             final LdapEntry entry = result.get(0);
             final String dn = entry.getDn();
 
-            log.trace("Try to authenticate dn {}", dn);
+            if(log.isTraceEnabled()) {
+                log.trace("Try to authenticate dn {}", dn);
+            }
 
             final BindRequest br = new BindRequest(dn, new Credential(password));
 
@@ -113,7 +115,9 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                 username = entry.getAttribute(usernameAttribute).getStringValue();
             }
 
-            log.debug("Authenticated username {}", username);
+            if(log.isDebugEnabled()) {
+                log.debug("Authenticated username {}", username);
+            }
 
             return new LdapUser(username, entry);
 
@@ -149,7 +153,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                     settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}",
                             username), SearchScope.SUBTREE);
 
-            if (result.isEmpty()) {
+            if (result == null || result.isEmpty()) {
                 throw new ElasticsearchSecurityException("No user " + username + " found");
             }
 

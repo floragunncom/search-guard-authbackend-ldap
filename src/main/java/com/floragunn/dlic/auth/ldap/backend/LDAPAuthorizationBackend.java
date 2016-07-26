@@ -112,7 +112,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         Connection connection = null;
 
         for (int i = 0; i < ldapHosts.length; i++) {
-            log.trace("Connect to {}", ldapHosts[i]);
+            
+            if(log.isTraceEnabled()) {
+                log.trace("Connect to {}", ldapHosts[i]);
+            }
 
             try {
 
@@ -128,7 +131,11 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
                 final ConnectionConfig config = new ConnectionConfig();
                 config.setLdapUrl("ldap" + (enableSSL ? "s" : "") + "://" + split[0] + ":" + port);
-                log.trace("Connect to {}", config.getLdapUrl());
+                
+                if(log.isTraceEnabled()) {
+                    log.trace("Connect to {}", config.getLdapUrl());
+                }
+                
                 Map<String, Object> props = configureSSL(config, settings);
 
                 DefaultConnectionFactory connFactory = new DefaultConnectionFactory(config);
@@ -252,7 +259,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
             if (isValidDn(authenticatedUser)) {
                 // assume dn
-                log.trace("{} is a valid DN", authenticatedUser);
+                if(log.isTraceEnabled()) {
+                    log.trace("{} is a valid DN", authenticatedUser);
+                }
                 entry = LdapHelper.lookup(connection, authenticatedUser);
 
                 if (entry == null) {
@@ -266,7 +275,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                         settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}",
                                 authenticatedUser), SearchScope.SUBTREE);
 
-                if (result.isEmpty()) {
+                if (result == null || result.isEmpty()) {
                     throw new ElasticsearchSecurityException("No user " + authenticatedUser + " found");
                 }
 
@@ -280,7 +289,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
             dn = entry.getDn().toString();
 
-            log.trace("User found with DN {}", dn);
+            if(log.isTraceEnabled()) {
+                log.trace("User found with DN {}", dn);
+            }
 
             final Set<String> userRolesDn = new HashSet<String>();
 
@@ -299,7 +310,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     }
                 }
 
-                log.trace("User roles count: {}", userRolesDn.size());
+                if(log.isTraceEnabled()) {
+                    log.trace("User roles count: {}", userRolesDn.size());
+                }
             }
 
             final Map<Tuple<String, LdapName>, LdapEntry> roles = new HashMap<Tuple<String, LdapName>, LdapEntry>();
@@ -322,13 +335,18 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     .replace("{0}", dn).replace("{1}", authenticatedUser)
                     .replace("{2}", userRoleAttributeValue == null ? "{2}" : userRoleAttributeValue), SearchScope.SUBTREE);
 
-            for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
-                final LdapEntry searchResultEntry = iterator.next();
-                roles.put(new Tuple<String, LdapName>(searchResultEntry.getDn().toString(), new LdapName(searchResultEntry.getDn())),
-                        searchResultEntry);
+            if(rolesResult != null) {
+                for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
+                    final LdapEntry searchResultEntry = iterator.next();
+                    roles.put(new Tuple<String, LdapName>(searchResultEntry.getDn().toString(), new LdapName(searchResultEntry.getDn())),
+                            searchResultEntry);
+                }
             }
+            
 
-            log.trace("non user roles count: {}", roles.size());
+            if(log.isTraceEnabled()) {
+                log.trace("non user roles count: {}", roles.size());
+            }
 
             for (final Iterator<String> it = userRolesDn.iterator(); it.hasNext();) {
                 final String stringVal = it.next();
@@ -341,7 +359,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             // nested roles
             if (settings.getAsBoolean(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, false)) {
 
-                log.trace("Evaluate nested roles");
+                if(log.isTraceEnabled()) {
+                    log.trace("Evaluate nested roles");
+                }
 
                 final Set<LdapEntry> nestedReturn = new HashSet<LdapEntry>(roles.values());
 
@@ -351,7 +371,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
                     final Set<LdapEntry> x = resolveNestedRoles(_entry.getKey(), connection, roleName);
 
-                    log.trace("{}. nested roles for {} {}", x.size(), _entry.getKey(), roleName);
+                    if(log.isTraceEnabled()) {
+                        log.trace("{}. nested roles for {} {}", x.size(), _entry.getKey(), roleName);
+                    }
 
                     nestedReturn.addAll(x);
 
@@ -424,7 +446,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                                     "{1}", role.v1()), SearchScope.SUBTREE);
 
                     // one
-                    if (_result.isEmpty()) {
+                    if (_result == null || _result.isEmpty()) {
                         log.warn("Cannot resolve role '{}' (NOT FOUND)", role.v1());
                     } else {
 
@@ -447,7 +469,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
         }
 
-        log.trace("role dn resolved to {}", roleDn);
+        if(log.isTraceEnabled()) {
+            log.trace("role dn resolved to {}", roleDn);
+        }
 
         final List<LdapEntry> rolesResult = LdapHelper.search(
                 ldapConnection,
@@ -458,7 +482,11 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
             final LdapEntry searchResultEntry = iterator.next();
             final String _role = searchResultEntry.getAttribute(roleName).getStringValue();
-            log.trace("nested l1 {}", searchResultEntry.getDn());
+            
+            if(log.isTraceEnabled()) {
+                log.trace("nested l1 {}", searchResultEntry.getDn());
+            }
+            
             try {
                 final Set<LdapEntry> in = resolveNestedRoles(new Tuple<String, LdapName>(_role, new LdapName(searchResultEntry.getDn())),
                         ldapConnection, roleName);
@@ -466,7 +494,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 for (final Iterator<LdapEntry> iterator2 = in.iterator(); iterator2.hasNext();) {
                     final LdapEntry entry = iterator2.next();
                     result.add(entry);
-                    log.trace("nested l2 {}", entry.getDn());
+                    
+                    if(log.isTraceEnabled()) {
+                        log.trace("nested l2 {}", entry.getDn());
+                    }
                 }
             } catch (final InvalidNameException e) {
                 throw new LdapException(e);

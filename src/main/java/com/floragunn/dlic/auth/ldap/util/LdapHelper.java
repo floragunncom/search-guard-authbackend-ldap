@@ -17,8 +17,6 @@ package com.floragunn.dlic.auth.ldap.util;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.elasticsearch.common.logging.ESLogger;
-import org.elasticsearch.common.logging.Loggers;
 import org.ldaptive.Connection;
 import org.ldaptive.DerefAliases;
 import org.ldaptive.LdapEntry;
@@ -31,8 +29,6 @@ import org.ldaptive.SearchScope;
 import org.ldaptive.referral.SearchReferralHandler;
 
 public class LdapHelper {
-
-    private static final ESLogger log = Loggers.getLogger(LdapHelper.class);
 
     public static List<LdapEntry> search(final Connection conn, final String baseDn, final String filter, final SearchScope searchScope,
             final String... attributes) throws LdapException {
