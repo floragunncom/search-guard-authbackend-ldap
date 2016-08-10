@@ -37,6 +37,7 @@ public class UtilsTest {
         Assert.assertEquals("\\5c\\28\\2a\\29", Utils.escapeStringRfc2254("\\(*)"));
         Assert.assertEquals("\\5c\\28\\2a\\29\\00", Utils.escapeStringRfc2254("\\(*)\0"));
         Assert.assertEquals("\\5c\\28abc\\2adef\\29\\00", Utils.escapeStringRfc2254("\\(abc*def)\0"));
+        Assert.assertNotEquals("\\5c\\28abc\\2adef\\29\\00", Utils.escapeStringRfc2254(Utils.escapeStringRfc2254("\\(abc*def)\0")));
     }
     
     @Test

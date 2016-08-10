@@ -71,6 +71,16 @@ import com.floragunn.searchguard.user.User;
 
 public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
+    static final String JKS = "JKS";
+    static final String PKCS12 = "PKCS12";
+    static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
+    static final String ONE_PLACEHOLDER = "{1}";
+    static final String TWO_PLACEHOLDER = "{2}";
+    static final String DEFAULT_ROLEBASE = "";
+    static final String DEFAULT_ROLESEARCH = "(member={0})";
+    static final String DEFAULT_ROLENAME = "name";
+    static final String DEFAULT_USERROLENAME = "memberOf";
+
     static {
         Utils.printLicenseInfo();
     }
@@ -195,10 +205,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             Environment env = new Environment(settings);
      
             File trustStore = env.configFile().resolve(settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH)).toFile();
-            String truststorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD,"changeit");
+            String truststorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD,DEFAULT_KEYSTORE_PASSWORD);
             
             File keystore = null;
-            String keystorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD,"changeit");        
+            String keystorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD,DEFAULT_KEYSTORE_PASSWORD);        
         
             final String _keystore = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH);
             
@@ -207,12 +217,12 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
             
             if (trustStore != null) {
-                final KeyStore myTrustStore = KeyStore.getInstance(trustStore.getName().endsWith("jks") ? "JKS" : "PKCS12");
+                final KeyStore myTrustStore = KeyStore.getInstance(trustStore.getName().endsWith(JKS.toLowerCase()) ? JKS : PKCS12);
                 myTrustStore.load(new FileInputStream(trustStore),
                         truststorePassword == null || truststorePassword.isEmpty() ? null : truststorePassword.toCharArray());
                 
                 if (enableClientAuth && keystore != null) {
-                    final KeyStore keyStore = KeyStore.getInstance(keystore.getName().endsWith("jks") ? "JKS" : "PKCS12");
+                    final KeyStore keyStore = KeyStore.getInstance(keystore.getName().endsWith(JKS.toLowerCase()) ? JKS : PKCS12);
                     keyStore.load(new FileInputStream(keystore), keystorePassword == null || keystorePassword.isEmpty() ? null
                             : keystorePassword.toCharArray());
                     
@@ -269,22 +279,12 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 }
 
             } else {
-                final List<LdapEntry> result = LdapHelper.search(
-                        connection,
-                        settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, ""),
-                        settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}",
-                                authenticatedUser), SearchScope.SUBTREE);
-
-                if (result == null || result.isEmpty()) {
+                
+                entry = LDAPAuthenticationBackend.exists(user.getName(), connection, settings);
+                
+                if (entry == null) {
                     throw new ElasticsearchSecurityException("No user " + authenticatedUser + " found");
                 }
-
-                if (result.size() > 1) {
-                    throw new ElasticsearchSecurityException("More than one user found");
-                }
-
-                entry = result.get(0);
-
             }
 
             dn = entry.getDn().toString();
@@ -300,7 +300,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             // user's directory entry. Use userRoleName to specify the name of
             // this attribute.
             final String userRoleName = settings
-                    .get(ConfigConstants.LDAP_AUTHZ_USERROLENAME, "memberOf");
+                    .get(ConfigConstants.LDAP_AUTHZ_USERROLENAME, DEFAULT_USERROLENAME);
             if (entry.getAttribute(userRoleName) != null) {
                 final Collection<String> userRoles = entry.getAttribute(userRoleName).getStringValues();
 
@@ -316,7 +316,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
 
             final Map<Tuple<String, LdapName>, LdapEntry> roles = new HashMap<Tuple<String, LdapName>, LdapEntry>();
-            final String roleName = settings.get(ConfigConstants.LDAP_AUTHZ_ROLENAME, "name");
+            final String roleName = settings.get(ConfigConstants.LDAP_AUTHZ_ROLENAME, DEFAULT_ROLENAME);
 
             // replace {2}
             final String userRoleAttribute = settings.get(ConfigConstants.LDAP_AUTHZ_USERROLEATTRIBUTE,
@@ -330,10 +330,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
             final List<LdapEntry> rolesResult = LdapHelper.search(
                     connection,
-                    settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, ""),
-                    settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(member={0})")
-                    .replace("{0}", dn).replace("{1}", authenticatedUser)
-                    .replace("{2}", userRoleAttributeValue == null ? "{2}" : userRoleAttributeValue), SearchScope.SUBTREE);
+                    settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
+                    settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
+                    .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, dn).replace(ONE_PLACEHOLDER, authenticatedUser)
+                    .replace(TWO_PLACEHOLDER, userRoleAttributeValue == null ? TWO_PLACEHOLDER : userRoleAttributeValue), SearchScope.SUBTREE);
 
             if(rolesResult != null) {
                 for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
@@ -441,9 +441,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     // search
                     final List<LdapEntry> _result = LdapHelper.search(
                             ldapConnection,
-                            settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, ""),
-                            settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(member={0})").replace(
-                                    "{1}", role.v1()), SearchScope.SUBTREE);
+                            settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
+                            settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH).replace(
+                                    ONE_PLACEHOLDER, role.v1()), SearchScope.SUBTREE);
 
                     // one
                     if (_result == null || _result.isEmpty()) {
@@ -475,9 +475,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
         final List<LdapEntry> rolesResult = LdapHelper.search(
                 ldapConnection,
-                settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, ""),
-                settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(member={0})")
-                .replace("{0}", roleDn == null ? role.v1() : roleDn.toString()).replace("{1}", role.v1()), SearchScope.SUBTREE);
+                settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
+                settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
+                .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, roleDn == null ? role.v1() : roleDn.toString()).replace(ONE_PLACEHOLDER, role.v1()), SearchScope.SUBTREE);
 
         for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
             final LdapEntry searchResultEntry = iterator.next();

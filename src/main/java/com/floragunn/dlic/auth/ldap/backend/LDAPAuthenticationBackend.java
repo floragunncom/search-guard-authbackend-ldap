@@ -14,11 +14,13 @@
 
 package com.floragunn.dlic.auth.ldap.backend;
 
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import org.elasticsearch.ElasticsearchSecurityException;
 import org.elasticsearch.SpecialPermission;
@@ -43,11 +45,15 @@ import com.floragunn.searchguard.user.User;
 
 public class LDAPAuthenticationBackend implements AuthenticationBackend {
 
+    static final String ZERO_PLACEHOLDER = "{0}";
+    static final String DEFAULT_USERBASE = "";
+    static final String DEFAULT_USERSEARCH_PATTERN = "(sAMAccountName={0})";
+
     static {
         Utils.printLicenseInfo();
     }
 
-    protected final ESLogger log = Loggers.getLogger(this.getClass());
+    protected static final ESLogger log = Loggers.getLogger(LDAPAuthenticationBackend.class);
     private final Settings settings;
 
     public LDAPAuthenticationBackend(final Settings settings) {
@@ -66,20 +72,18 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
 
             ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
 
-            final List<LdapEntry> result = LdapHelper.search(ldapConnection,
-                    settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, ""),
-                    settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}", user),
-                    SearchScope.SUBTREE);
+            LdapEntry entry = exists(user, ldapConnection, settings);
 
-            if (result == null || result.isEmpty()) {
+            //fake a user that no exists
+            //makes guessing if a user exists or not harder when looking on the authentication delay time
+            if(entry == null && settings.getAsBoolean(ConfigConstants.LDAP_FAKE_LOGIN_ENABLED, false)) {                
+                String fakeLognDn = settings.get(ConfigConstants.LDAP_FAKE_LOGIN_DN, "CN=faketomakebindfail,DC="+UUID.randomUUID().toString());
+                entry = new LdapEntry(fakeLognDn);
+                password = settings.get(ConfigConstants.LDAP_FAKE_LOGIN_Password, "fakeLoginPwd123").getBytes(StandardCharsets.UTF_8);
+            } else if(entry == null) {
                 throw new ElasticsearchSecurityException("No user " + user + " found");
             }
-
-            if (result.size() > 1) {
-                throw new ElasticsearchSecurityException("More than one user found");
-            }
-
-            final LdapEntry entry = result.get(0);
+            
             final String dn = entry.getDn();
 
             if(log.isTraceEnabled()) {
@@ -87,8 +91,6 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
             }
 
             final BindRequest br = new BindRequest(dn, new Credential(password));
-
-            
             final SecurityManager sm = System.getSecurityManager();
 
             if (sm != null) {
@@ -140,35 +142,37 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     @Override
     public boolean exists(final User user) {
         Connection ldapConnection = null;
-        
-        final String username = Utils.escapeStringRfc2254(user.getName());
 
         try {
-
             ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
-
-            final List<LdapEntry> result = LdapHelper.search(
-                    ldapConnection,
-                    settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, ""),
-                    settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(sAMAccountName={0})").replace("{0}",
-                            username), SearchScope.SUBTREE);
-
-            if (result == null || result.isEmpty()) {
-                throw new ElasticsearchSecurityException("No user " + username + " found");
-            }
-
-            if (result.size() > 1) {
-                throw new ElasticsearchSecurityException("More than one user for '" + username + "' found");
-            }
-
+            return exists(user.getName(), ldapConnection, settings) != null; 
         } catch (final Exception e) {
             log.error(e.toString(), e);
             return false;
         } finally {
             Utils.unbindAndCloseSilently(ldapConnection);
         }
+    }
+    
+    static LdapEntry exists(final String user, Connection ldapConnection, Settings settings) throws Exception {
+        final String username = Utils.escapeStringRfc2254(user);
 
-        return true;
+        final List<LdapEntry> result = LdapHelper.search(ldapConnection,
+                settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, DEFAULT_USERBASE),
+                settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, DEFAULT_USERSEARCH_PATTERN).replace(ZERO_PLACEHOLDER, username),
+                SearchScope.SUBTREE);
+
+        if (result == null || result.isEmpty()) {
+            log.debug("No user " + username + " found");
+            return null;
+        }
+
+        if (result.size() > 1) {
+            log.debug("More than one user for '" + username + "' found");
+            return null;
+        }
+
+        return result.get(0);
     }
 
 }

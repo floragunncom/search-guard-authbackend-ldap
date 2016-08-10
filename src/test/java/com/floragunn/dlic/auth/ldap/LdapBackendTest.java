@@ -78,6 +78,21 @@ public class LdapBackendTest {
     }
     
     @Test(expected=ElasticsearchSecurityException.class)
+    public void testLdapAuthenticationFakeLogin() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAP_FAKE_LOGIN_ENABLED, true)
+                .build();
+
+        new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("unknown", "unknown"
+                .getBytes(StandardCharsets.UTF_8)));
+    }
+    
+    @Test(expected=ElasticsearchSecurityException.class)
     public void testLdapInjection() throws Exception {
 
         startLDAPServer();
@@ -139,6 +154,18 @@ public class LdapBackendTest {
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})").build();
 
         new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "wrong".getBytes(StandardCharsets.UTF_8)));
+    }
+    
+    @Test(expected=ElasticsearchSecurityException.class)
+    public void testLdapAuthenticationNoUser() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS,  "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})").build();
+
+        new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("UNKNOWN", "UNKNOWN".getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test(expected = ElasticsearchSecurityException.class)
