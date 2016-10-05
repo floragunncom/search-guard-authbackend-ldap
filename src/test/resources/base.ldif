@@ -59,6 +59,14 @@ mail: spock@example.com
 description: vulcan
 ou: Human Resources
 
+dn: cn=Special\, Sign,ou=people,o=TEST
+objectclass: inetOrgPerson
+cn: Special\, Sign
+sn: ssign
+uid: ssign
+userpassword: ssignsecret
+mail: ssign@example.com
+
 dn: cn=ceo,ou=groups,o=TEST
 objectClass: groupOfUniqueNames
 cn: ceo
