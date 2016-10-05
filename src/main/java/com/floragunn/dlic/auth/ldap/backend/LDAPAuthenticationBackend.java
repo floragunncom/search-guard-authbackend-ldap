@@ -142,10 +142,15 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     @Override
     public boolean exists(final User user) {
         Connection ldapConnection = null;
+        String userName = user.getName();
+        
+        if(user instanceof LdapUser) {
+            userName = ((LdapUser) user).getUserEntry().getDn(); 
+        }
 
         try {
             ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
-            return exists(user.getName(), ldapConnection, settings) != null; 
+            return exists(userName, ldapConnection, settings) != null; 
         } catch (final Exception e) {
             log.error(e.toString(), e);
             return false;
