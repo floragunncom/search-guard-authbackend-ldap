@@ -24,8 +24,8 @@ import java.util.UUID;
 
 import org.elasticsearch.ElasticsearchSecurityException;
 import org.elasticsearch.SpecialPermission;
-import org.elasticsearch.common.logging.ESLogger;
-import org.elasticsearch.common.logging.Loggers;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.elasticsearch.common.settings.Settings;
 import org.ldaptive.BindRequest;
 import org.ldaptive.Connection;
@@ -53,7 +53,8 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
         Utils.printLicenseInfo();
     }
 
-    protected static final ESLogger log = Loggers.getLogger(LDAPAuthenticationBackend.class);
+    protected static final Logger log = LogManager.getLogger(LDAPAuthenticationBackend.class);
+
     private final Settings settings;
 
     public LDAPAuthenticationBackend(final Settings settings) {

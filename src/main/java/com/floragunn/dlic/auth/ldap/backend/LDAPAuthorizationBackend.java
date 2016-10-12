@@ -37,12 +37,12 @@ import java.util.Set;
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.elasticsearch.ElasticsearchSecurityException;
 import org.elasticsearch.SpecialPermission;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.collect.Tuple;
-import org.elasticsearch.common.logging.ESLogger;
-import org.elasticsearch.common.logging.Loggers;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.env.Environment;
 import org.ldaptive.BindRequest;
@@ -85,7 +85,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         Utils.printLicenseInfo();
     }
 
-    protected static final ESLogger log = Loggers.getLogger(LDAPAuthorizationBackend.class);
+    protected static final Logger log = LogManager.getLogger(LDAPAuthorizationBackend.class);
     final Settings settings;
 
     public LDAPAuthorizationBackend(final Settings settings) {
