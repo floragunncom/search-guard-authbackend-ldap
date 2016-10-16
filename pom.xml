@@ -23,7 +23,7 @@
 
   <groupId>com.floragunn</groupId>
   <artifactId>dlic-search-guard-authbackend-ldap</artifactId>
-  <version>5.0-3-SNAPSHOT</version>
+  <version>5.0-3-rc1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Search Guard</name>
@@ -43,8 +43,7 @@
   </distributionManagement>
 
   <properties>
-    <sg2.version>5.0.0-rc1-6a</sg2.version>
-    <sgssl.version>2.4.0.16</sgssl.version>
+    <sg2.version>5.0.0-rc1-6d</sg2.version>
     <apache.ds.version>2.0.0-M21</apache.ds.version>
     <elasticsearch.version>5.0.0-rc1</elasticsearch.version>
     <dependency.locations.enabled>false</dependency.locations.enabled>
@@ -93,15 +92,7 @@
       <version>2.6.2</version>
       <scope>provided</scope>
     </dependency>
-    
-    <!-- 
-    <dependency>
-      <groupId>com.floragunn</groupId>
-      <artifactId>search-guard-ssl</artifactId>
-      <version>${sgssl.version}</version>
-      <scope>provided</scope>
-    </dependency>
- -->
+
     <dependency>
       <groupId>org.elasticsearch</groupId>
       <artifactId>elasticsearch</artifactId>
