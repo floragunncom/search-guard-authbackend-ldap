@@ -265,6 +265,14 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             authenticatedUser =  Utils.escapeStringRfc2254(user.getName());
         }
 
+        final String[] skipUsers = settings.getAsArray(ConfigConstants.LDAP_AUTHZ_SKIP_USERS, new String[] {});
+        if (Arrays.asList(skipUsers).contains(authenticatedUser)) {
+            if (log.isDebugEnabled()) {
+                log.debug("Skipped search roles of user {}", authenticatedUser);
+            }
+            return;
+        }
+
         LdapEntry entry = null;
         String dn = null;
         Connection connection = null;
