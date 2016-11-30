@@ -258,11 +258,14 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     public void fillRoles(final User user, final AuthCredentials optionalAuthCreds) throws ElasticsearchSecurityException {
 
         String authenticatedUser;
+        String originalUserName;
         
         if(user instanceof LdapUser) {
             authenticatedUser = ((LdapUser) user).getUserEntry().getDn(); 
+            originalUserName = ((LdapUser) user).getOriginalUsername();
         } else {
             authenticatedUser =  Utils.escapeStringRfc2254(user.getName());
+            originalUserName = user.getName();
         }
 
         LdapEntry entry = null;
@@ -338,7 +341,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     connection,
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
-                    .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, dn).replace(ONE_PLACEHOLDER, authenticatedUser)
+                    .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, dn).replace(ONE_PLACEHOLDER, originalUserName)
                     .replace(TWO_PLACEHOLDER, userRoleAttributeValue == null ? TWO_PLACEHOLDER : userRoleAttributeValue), SearchScope.SUBTREE);
 
             if(rolesResult != null) {

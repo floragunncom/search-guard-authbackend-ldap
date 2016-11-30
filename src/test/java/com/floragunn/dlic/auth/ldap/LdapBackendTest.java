@@ -323,6 +323,37 @@ public class LdapBackendTest {
         new LDAPAuthorizationBackend(settings).fillRoles(user, null);
         Assert.assertEquals("cn=Special\\, Sign,ou=people,o=TEST", user.getName());
     }
+    
+    @Test
+    public void testLdapAuthorizationRoleSearchUsername() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(cn={0})")
+                .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "cn")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember=cn={1},ou=people,o=TEST)")
+                // .put("searchguard.authentication.authorization.ldap.userrolename",
+                // "(uniqueMember={0})")
+                .build();
+
+        final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("Michael Jackson", "secret"
+                .getBytes(StandardCharsets.UTF_8)));
+
+        new LDAPAuthorizationBackend(settings).fillRoles(user, null);
+
+        Assert.assertNotNull(user);
+        Assert.assertEquals("Michael Jackson", user.getOriginalUsername());
+        Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getUserEntry().getDn());
+        System.out.println(user.getRoles());
+        Assert.assertEquals(2, user.getRoles().size());
+        Assert.assertEquals("ceo", new ArrayList(new TreeSet(user.getRoles())).get(0));
+        Assert.assertEquals(2, user.getRoleEntries().size());
+        Assert.assertEquals(user.getName(), user.getUserEntry().getDn());
+    }
 
     @After
     public void tearDown() throws Exception {

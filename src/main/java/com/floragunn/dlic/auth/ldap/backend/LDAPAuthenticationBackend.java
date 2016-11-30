@@ -121,7 +121,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                 log.debug("Authenticated username {}", username);
             }
 
-            return new LdapUser(username, entry);
+            return new LdapUser(username, user, entry);
 
         } catch (final Exception e) {
             log.error(e.toString(), e);
