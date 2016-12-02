@@ -202,6 +202,82 @@ public class LdapBackendTest {
     }
     
     @Test
+    public void testLdapAuthenticationSSLSSLv3() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapsPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
+                .put("searchguard.ssl.transport.keystore_filepath", getAbsoluteFilePathFromClassPath("node-0-keystore.jks"))
+                .put("searchguard.ssl.transport.truststore_filepath", getAbsoluteFilePathFromClassPath("truststore.jks"))
+                .put("verify_hostnames", false)
+                .putArray("enabled_ssl_protocols", "SSLv3")
+                .put("path.home",".")
+                .build();
+
+        try {
+            new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
+                    .getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            Assert.assertEquals(e.getCause().getClass(), org.ldaptive.LdapException.class);
+            Assert.assertTrue(e.getCause().getMessage().contains("Unable to connec"));
+        }
+        
+    }
+    
+    @Test
+    public void testLdapAuthenticationSSLUnknowCipher() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapsPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
+                .put("searchguard.ssl.transport.keystore_filepath", getAbsoluteFilePathFromClassPath("node-0-keystore.jks"))
+                .put("searchguard.ssl.transport.truststore_filepath", getAbsoluteFilePathFromClassPath("truststore.jks"))
+                .put("verify_hostnames", false)
+                .putArray("enabled_ssl_ciphers", "AAA")
+                .put("path.home",".")
+                .build();
+
+        try {
+            new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
+                    .getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            Assert.assertEquals(e.getCause().getClass(), org.ldaptive.LdapException.class);
+            Assert.assertTrue(e.getCause().getMessage().contains("Unable to connec"));
+        }
+        
+    }
+    
+    @Test
+    public void testLdapAuthenticationSpecialCipherProtocol() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapsPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
+                .put("searchguard.ssl.transport.keystore_filepath", getAbsoluteFilePathFromClassPath("node-0-keystore.jks"))
+                .put("searchguard.ssl.transport.truststore_filepath", getAbsoluteFilePathFromClassPath("truststore.jks"))
+                .put("verify_hostnames", false)
+                .putArray("enabled_ssl_protocols", "TLSv1")
+                .putArray("enabled_ssl_ciphers", "TLS_DHE_RSA_WITH_AES_128_CBC_SHA")
+                .put("path.home",".")
+                .build();
+
+        final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
+                .getBytes(StandardCharsets.UTF_8)));
+        Assert.assertNotNull(user);
+        Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
+        
+    }
+    
+    @Test
     public void testLdapAuthenticationSSLNoKeystore() throws Exception {
 
         startLDAPServer();

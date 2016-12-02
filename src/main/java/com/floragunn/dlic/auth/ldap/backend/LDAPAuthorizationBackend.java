@@ -205,10 +205,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             Environment env = new Environment(settings);
      
             File trustStore = env.configFile().resolve(settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH)).toFile();
-            String truststorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD,DEFAULT_KEYSTORE_PASSWORD);
+            String truststorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);
             
             File keystore = null;
-            String keystorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD,DEFAULT_KEYSTORE_PASSWORD);        
+            String keystorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);        
         
             final String _keystore = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH);
             
@@ -243,7 +243,18 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 sslConfig.setTrustManagers(new HostnameVerifyingTrustManager(new AllowAnyHostnameVerifier(), "dummy"));
             }
 
-            sslConfig.setEnabledProtocols(new String[] { "TLSv1.1", "TLSv1.2" });
+            //https://github.com/floragunncom/search-guard/issues/227
+            final String[] enabledCipherSuites = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, new String[0]);   
+            final String[] enabledProtocols = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, new String[] { "TLSv1.1", "TLSv1.2" });   
+            
+
+            if(enabledCipherSuites.length > 0) {
+                sslConfig.setEnabledCipherSuites(enabledCipherSuites);
+                log.debug("enabled ssl cipher suites for ldaps {}", Arrays.toString(enabledCipherSuites));
+            }
+            
+            log.debug("enabled ssl/tls protocols for ldaps {}", Arrays.toString(enabledProtocols));
+            sslConfig.setEnabledProtocols(enabledProtocols);
             config.setSslConfig(sslConfig);
         }
 

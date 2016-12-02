@@ -38,6 +38,9 @@ public final class ConfigConstants {
     public static final String LDAPS_ENABLE_SSL = "enable_ssl";
     public static final String LDAPS_ENABLE_START_TLS = "enable_start_tls";
     public static final String LDAPS_ENABLE_SSL_CLIENT_AUTH = "enable_ssl_client_auth";
+    
+    public static final String LDAPS_ENABLED_SSL_CIPHERS = "enabled_ssl_ciphers";
+    public static final String LDAPS_ENABLED_SSL_PROTOCOLS = "enabled_ssl_protocols";
 
     private ConfigConstants() {
 
