@@ -429,7 +429,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
 
         } catch (final Exception e) {
-            log.error(e.toString(), e);
+            log.debug("Unable to fill user roles due to {}",e.toString());
             throw new ElasticsearchSecurityException(e.toString(), e);
         } finally {
             Utils.unbindAndCloseSilently(connection);
