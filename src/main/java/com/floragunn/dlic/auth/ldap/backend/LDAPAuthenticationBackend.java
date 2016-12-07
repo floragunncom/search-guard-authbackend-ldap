@@ -122,10 +122,10 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                 log.debug("Authenticated username {}", username);
             }
 
-            return new LdapUser(username, entry);
+            return new LdapUser(username, user, entry);
 
         } catch (final Exception e) {
-            log.error(e.toString(), e);
+            log.debug("Unable to authenticate user due to {}", e.toString());
             throw new ElasticsearchSecurityException(e.toString(), e);
         } finally {
             Arrays.fill(password, (byte) '\0');
