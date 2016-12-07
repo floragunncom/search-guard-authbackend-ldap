@@ -205,10 +205,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             Environment env = new Environment(settings);
      
             File trustStore = env.configFile().resolve(settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH)).toFile();
-            String truststorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD,DEFAULT_KEYSTORE_PASSWORD);
+            String truststorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);
             
             File keystore = null;
-            String keystorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD,DEFAULT_KEYSTORE_PASSWORD);        
+            String keystorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);        
         
             final String _keystore = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH);
             
@@ -243,7 +243,18 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 sslConfig.setTrustManagers(new HostnameVerifyingTrustManager(new AllowAnyHostnameVerifier(), "dummy"));
             }
 
-            sslConfig.setEnabledProtocols(new String[] { "TLSv1.1", "TLSv1.2" });
+            //https://github.com/floragunncom/search-guard/issues/227
+            final String[] enabledCipherSuites = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, new String[0]);   
+            final String[] enabledProtocols = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, new String[] { "TLSv1.1", "TLSv1.2" });   
+            
+
+            if(enabledCipherSuites.length > 0) {
+                sslConfig.setEnabledCipherSuites(enabledCipherSuites);
+                log.debug("enabled ssl cipher suites for ldaps {}", Arrays.toString(enabledCipherSuites));
+            }
+            
+            log.debug("enabled ssl/tls protocols for ldaps {}", Arrays.toString(enabledProtocols));
+            sslConfig.setEnabledProtocols(enabledProtocols);
             config.setSslConfig(sslConfig);
         }
 
@@ -258,11 +269,14 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     public void fillRoles(final User user, final AuthCredentials optionalAuthCreds) throws ElasticsearchSecurityException {
 
         String authenticatedUser;
+        String originalUserName;
         
         if(user instanceof LdapUser) {
             authenticatedUser = ((LdapUser) user).getUserEntry().getDn(); 
+            originalUserName = ((LdapUser) user).getOriginalUsername();
         } else {
             authenticatedUser =  Utils.escapeStringRfc2254(user.getName());
+            originalUserName = user.getName();
         }
 
         LdapEntry entry = null;
@@ -338,7 +352,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     connection,
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
-                    .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, dn).replace(ONE_PLACEHOLDER, authenticatedUser)
+                    .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, dn).replace(ONE_PLACEHOLDER, originalUserName)
                     .replace(TWO_PLACEHOLDER, userRoleAttributeValue == null ? TWO_PLACEHOLDER : userRoleAttributeValue), SearchScope.SUBTREE);
 
             if(rolesResult != null) {
@@ -415,7 +429,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
 
         } catch (final Exception e) {
-            log.error(e.toString(), e);
+            log.debug("Unable to fill user roles due to {}",e.toString());
             throw new ElasticsearchSecurityException(e.toString(), e);
         } finally {
             Utils.unbindAndCloseSilently(connection);

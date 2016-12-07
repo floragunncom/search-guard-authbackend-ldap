@@ -31,9 +31,11 @@ public class LdapUser extends User {
     private static final long serialVersionUID = 1L;
     private final LdapEntry userEntry;
     private final Set<LdapEntry> roleEntries = new HashSet<>();
+    private final String originalUsername;
 
-    public LdapUser(final String name, final LdapEntry userEntry) {
+    public LdapUser(final String name, String originalUsername, final LdapEntry userEntry) {
         super(name);
+        this.originalUsername = originalUsername;
         this.userEntry = userEntry;
     }
 
@@ -47,6 +49,14 @@ public class LdapUser extends User {
 
     public LdapEntry getUserEntry() {
         return userEntry;
+    }
+    
+    public String getDn() {
+        return userEntry.getDn();
+    }
+
+    public String getOriginalUsername() {
+        return originalUsername;
     }
 
     public Set<LdapEntry> getRoleEntries() {
