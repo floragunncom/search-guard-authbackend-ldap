@@ -454,6 +454,56 @@ public class LdapBackendTest {
         Assert.assertEquals(2, user.getRoles().size());
         Assert.assertEquals("ceo", new ArrayList(new TreeSet(user.getRoles())).get(0));
     }
+    
+    @Test
+    public void testLdapAuthorizationDnNested() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "dn")
+                .put(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, true)
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember={0})")
+                .build();
+
+        final User user = new User("jacksonm");
+
+        new LDAPAuthorizationBackend(settings).fillRoles(user, null);
+
+        Assert.assertNotNull(user);
+        Assert.assertEquals("jacksonm", user.getName());
+        Assert.assertEquals(2, user.getRoles().size());
+        Assert.assertEquals("cn=ceo,ou=groups,o=TEST", new ArrayList(new TreeSet(user.getRoles())).get(0));
+    }
+    
+    @Test
+    public void testLdapAuthorizationDn() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "dn")
+                .put(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, false)
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember={0})")
+                .build();
+
+        final User user = new User("jacksonm");
+
+        new LDAPAuthorizationBackend(settings).fillRoles(user, null);
+
+        Assert.assertNotNull(user);
+        Assert.assertEquals("jacksonm", user.getName());
+        Assert.assertEquals(2, user.getRoles().size());
+        Assert.assertEquals("cn=ceo,ou=groups,o=TEST", new ArrayList(new TreeSet(user.getRoles())).get(0));
+    }
 
     @After
     public void tearDown() throws Exception {
