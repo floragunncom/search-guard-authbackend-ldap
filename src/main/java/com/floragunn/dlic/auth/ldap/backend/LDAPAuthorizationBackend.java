@@ -175,8 +175,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     break;
                 }
             } catch (final Exception e) {
-                log.warn("Unable to connect to ldapserver {} due to {}. Try next.", e, ldapHosts[i], e.toString());
-                e.printStackTrace();
+                log.warn("Unable to connect to ldapserver {} due to {}. Try next.", ldapHosts[i], e.toString());
+                if(log.isDebugEnabled()) {
+                    log.debug("Unable to connect to ldapserver due to ",e);
+                }
                 Utils.unbindAndCloseSilently(connection);
                 continue;
             }
@@ -401,8 +403,13 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
                 for (final Iterator<LdapEntry> iterator = nestedReturn.iterator(); iterator.hasNext();) {
                     final LdapEntry entry2 = iterator.next();
-                    final String role = entry2.getAttribute(roleName).getStringValue();
-                    user.addRole(role);
+                    final String role = getRoleFromAttribute(entry2, roleName);
+                    
+                    if(!Strings.isNullOrEmpty(role)) {
+                        user.addRole(role);
+                    } else {
+                        log.warn("No or empty attribute '{}' for entry {}", roleName, entry2.getDn());
+                    }
                 }
 
                 if (user instanceof LdapUser) {
@@ -413,12 +420,13 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
                 for (final Iterator<LdapEntry> iterator = roles.values().iterator(); iterator.hasNext();) {
                     final LdapEntry entry2 = iterator.next();
-                    final LdapAttribute e = entry2.getAttribute(roleName);
-                    if (e != null) {
-                        final String role = e.getStringValue();
+                    
+                    final String role = getRoleFromAttribute(entry2, roleName);
+                    
+                    if(!Strings.isNullOrEmpty(role)) {
                         user.addRole(role);
                     } else {
-                        log.warn("No attribute '{}' for entry {}", roleName, entry2.getDn());
+                        log.warn("No or empty attribute '{}' for entry {}", roleName, entry2.getDn());
                     }
 
                 }
@@ -429,7 +437,9 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
 
         } catch (final Exception e) {
-            log.debug("Unable to fill user roles due to {}",e.toString());
+            if(log.isDebugEnabled()) {
+                log.debug("Unable to fill user roles due to ",e);
+            }
             throw new ElasticsearchSecurityException(e.toString(), e);
         } finally {
             Utils.unbindAndCloseSilently(connection);
@@ -501,12 +511,13 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
         for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
             final LdapEntry searchResultEntry = iterator.next();
-            final String _role = searchResultEntry.getAttribute(roleName).getStringValue();
+            final String _role = getRoleFromAttribute(searchResultEntry, roleName);
             
             if(log.isTraceEnabled()) {
-                log.trace("nested l1 {}", searchResultEntry.getDn());
+                log.trace("nested l1 {} for {}", _role, searchResultEntry.getDn());
             }
             
+            //_role might be null
             try {
                 final Set<LdapEntry> in = resolveNestedRoles(new Tuple<String, LdapName>(_role, new LdapName(searchResultEntry.getDn())),
                         ldapConnection, roleName);
@@ -549,6 +560,25 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         }
 
         return true;
+    }
+    
+    private String getRoleFromAttribute(final LdapEntry entry, final String role) {
+
+        if (entry == null || Strings.isNullOrEmpty(role)) {
+            return null;
+        }
+
+        if("dn".equalsIgnoreCase(role)) {
+            return entry.getDn();
+        }
+        
+        final LdapAttribute attr = entry.getAttribute(role);
+        
+        if(attr != null) {
+            return attr.getStringValue();
+        }
+        
+        return null;
     }
 
 }

@@ -125,7 +125,9 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
             return new LdapUser(username, user, entry);
 
         } catch (final Exception e) {
-            log.debug("Unable to authenticate user due to {}", e.toString());
+            if(log.isDebugEnabled()) {
+                log.debug("Unable to authenticate user due to ", e);
+            }
             throw new ElasticsearchSecurityException(e.toString(), e);
         } finally {
             Arrays.fill(password, (byte) '\0');
@@ -153,7 +155,10 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
             ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
             return exists(userName, ldapConnection, settings) != null; 
         } catch (final Exception e) {
-            log.error(e.toString(), e);
+            log.warn("User {} does not exist due to "+e, userName);
+            if(log.isDebugEnabled()) {
+                log.debug("User does not exist due to ", e);
+            }
             return false;
         } finally {
             Utils.unbindAndCloseSilently(ldapConnection);
