@@ -456,6 +456,32 @@ public class LdapBackendTest {
     }
     
     @Test
+    public void testLdapAuthorizationNested() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "cn")
+                .put(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, true)
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember={0})")
+                .build();
+
+        final User user = new User("spock");
+
+        new LDAPAuthorizationBackend(settings).fillRoles(user, null);
+
+        Assert.assertNotNull(user);
+        Assert.assertEquals("spock", user.getName());
+        Assert.assertEquals(4, user.getRoles().size());
+        Assert.assertEquals("nested1", new ArrayList(new TreeSet(user.getRoles())).get(1));
+        System.out.println(user.getRoles());
+    }
+    
+    @Test
     public void testLdapAuthorizationDnNested() throws Exception {
 
         startLDAPServer();
@@ -470,14 +496,14 @@ public class LdapBackendTest {
                 .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember={0})")
                 .build();
 
-        final User user = new User("jacksonm");
+        final User user = new User("spock");
 
         new LDAPAuthorizationBackend(settings).fillRoles(user, null);
 
         Assert.assertNotNull(user);
-        Assert.assertEquals("jacksonm", user.getName());
-        Assert.assertEquals(2, user.getRoles().size());
-        Assert.assertEquals("cn=ceo,ou=groups,o=TEST", new ArrayList(new TreeSet(user.getRoles())).get(0));
+        Assert.assertEquals("spock", user.getName());
+        Assert.assertEquals(4, user.getRoles().size());
+        Assert.assertEquals("cn=nested1,ou=groups,o=TEST", new ArrayList(new TreeSet(user.getRoles())).get(1));
     }
     
     @Test
@@ -491,11 +517,12 @@ public class LdapBackendTest {
                 .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST")
                 .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
                 .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "dn")
+                .put(ConfigConstants.LDAP_AUTHC_USERNAME_ATTRIBUTE, "UID")
                 .put(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, false)
                 .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember={0})")
                 .build();
 
-        final User user = new User("jacksonm");
+        final User user = new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret".getBytes()));
 
         new LDAPAuthorizationBackend(settings).fillRoles(user, null);
 
@@ -505,6 +532,41 @@ public class LdapBackendTest {
         Assert.assertEquals("cn=ceo,ou=groups,o=TEST", new ArrayList(new TreeSet(user.getRoles())).get(0));
     }
 
+    @Test
+    public void testLdapAuthenticationUserNameAttribute() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder().putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST").put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAP_AUTHC_USERNAME_ATTRIBUTE, "uid").build();
+
+        final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
+                .getBytes(StandardCharsets.UTF_8)));
+        Assert.assertNotNull(user);
+        Assert.assertEquals("jacksonm", user.getName());
+    }
+
+    @Test
+    public void testLdapAuthenticationStartTLS() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAPS_ENABLE_START_TLS, true)
+                .put("searchguard.ssl.transport.keystore_filepath", getAbsoluteFilePathFromClassPath("node-0-keystore.jks"))
+                .put("searchguard.ssl.transport.truststore_filepath", getAbsoluteFilePathFromClassPath("truststore.jks"))
+                .put("verify_hostnames", false).put("path.home", ".")
+                .build();
+
+        final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
+                .getBytes(StandardCharsets.UTF_8)));
+        Assert.assertNotNull(user);
+        Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
+    }
+    
     @After
     public void tearDown() throws Exception {
 
@@ -514,310 +576,6 @@ public class LdapBackendTest {
 
     }
 
-    /*
-        @Test
-        public void testLdapAuthenticationUserNameAttribute() throws Exception {
-
-            startLDAPServer();
-
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "123.xxx.1:838b9", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.ldap.username_attribute", "uid")
-
-                    .build();
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-
-            final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
-                    .toCharArray()));
-            Assert.assertNotNull(user);
-            Assert.assertEquals("jacksonm", user.getName());
-        }
-
-        @Test
-        public void testLdapAuthenticationSSL() throws Exception {
-
-            startLDAPServer();
-
-            final Settings settings = Settings.builder()
-                    .settingsBuilder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapsServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.ldap.ldaps.ssl.enabled", "true")
-                    .put("searchguard.authentication.ldap.ldaps.starttls.enabled", "false")
-
-                    .put("searchguard.authentication.ldap.ldaps.truststore_filepath",
-                            SecurityUtil.getAbsoluteFilePathFromClassPath("SearchguardTS.jks")).build();
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-
-            final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
-                    .toCharArray()));
-            Assert.assertNotNull(user);
-            Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
-        }
-
-        @Test(expected = AuthException.class)
-        public void testLdapAuthenticationSSLWrongPwd() throws Exception {
-
-            startLDAPServer();
-
-            final Settings settings = Settings.builder()
-                    .settingsBuilder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapsServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.ldap.ldaps.ssl.enabled", "true")
-                    .put("searchguard.authentication.ldap.ldaps.starttls.enabled", "false")
-
-                    .put("searchguard.authentication.ldap.ldaps.truststore_filepath",
-                            SecurityUtil.getAbsoluteFilePathFromClassPath("SearchguardTS.jks")).build();
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-
-            final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm",
-                    "secret-wrong".toCharArray()));
-            Assert.assertNotNull(user);
-            Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
-        }
-
-        @Test
-        public void testLdapAuthenticationStartTLS() throws Exception {
-
-            startLDAPServer();
-
-            final Settings settings = Settings.builder()
-                    .settingsBuilder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.ldap.ldaps.ssl.enabled", "false")
-                    .put("searchguard.authentication.ldap.ldaps.starttls.enabled", "true")
-                    .put("searchguard.authentication.ldap.ldaps.truststore_filepath",
-                            SecurityUtil.getAbsoluteFilePathFromClassPath("SearchguardTS.jks")).build();
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-
-            final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
-                    .toCharArray()));
-            Assert.assertNotNull(user);
-            Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
-        }
-
-        @Test(expected = AuthException.class)
-        public void testLdapAuthenticationSSLPlainFail() throws Exception {
-
-            startLDAPServer();
-
-            final Settings settings = Settings.builder()
-                    .settingsBuilder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapsServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.ldap.ldaps.ssl.enabled", "false")
-                    .put("searchguard.authentication.ldap.ldaps.starttls.enabled", "false")
-
-                    .put("searchguard.authentication.ldap.ldaps.truststore_filepath",
-                            SecurityUtil.getAbsoluteFilePathFromClassPath("SearchguardTS.jks")).build();
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-
-            final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret"
-                    .toCharArray()));
-            Assert.assertNotNull(user);
-            Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
-        }
-
-        @Test(expected = AuthException.class)
-        public void testLdapAuthenticationFail() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})").build();
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-
-            final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm",
-                    "secret-wrong".toCharArray()));
-            Assert.assertNotNull(user);
-            Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
-        }
-
-        @Test
-        public void testLdapAuthorizationDN() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})").build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            final User user = new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret".toCharArray()));
-            Assert.assertTrue(user instanceof LdapUser);
-            new LDAPAuthorizator(settings).fillRoles(user, new AuthCredentials(user.getName(), null));
-            Assert.assertEquals(2, user.getRoles().size());
-            Assert.assertEquals(2, ((LdapUser) user).getRoleEntries().size());
-        }
-
-        @Test(expected = AuthException.class)
-        public void testLdapAuthorizationDNWithNonAnonBindFail() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})")
-                    .put("searchguard.authentication.ldap.bind_dn", "xxx").put("searchguard.authentication.ldap.password", "ccc").build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            final User user = new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret".toCharArray()));
-            Assert.assertTrue(user instanceof LdapUser);
-            new LDAPAuthorizator(settings).fillRoles(user, new AuthCredentials(user.getName(), null));
-            Assert.assertEquals(2, user.getRoles().size());
-            Assert.assertEquals(2, ((LdapUser) user).getRoleEntries().size());
-
-        }
-
-        @Test
-        public void testLdapAuthorizationDNWithNonAnonBind() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})")
-                    .put("searchguard.authentication.ldap.bind_dn", "cn=Captain Spock,ou=people,o=TEST")
-                    .put("searchguard.authentication.ldap.password", "spocksecret").build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            final User user = new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("jacksonm", "secret".toCharArray()));
-            Assert.assertTrue(user instanceof LdapUser);
-            new LDAPAuthorizator(settings).fillRoles(user, new AuthCredentials(user.getName(), null));
-            Assert.assertEquals(2, user.getRoles().size());
-            Assert.assertEquals(2, ((LdapUser) user).getRoleEntries().size());
-
-        }
-
-        @Test
-        public void testLdapAuthorization() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})").build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            final LdapUser user = new LdapUser("jacksonm", null);
-            new LDAPAuthorizator(settings).fillRoles(user, new AuthCredentials("jacksonm", null));
-            Assert.assertEquals(2, user.getRoles().size());
-            Assert.assertEquals(2, user.getRoleEntries().size());
-
-        }
-
-        @Test
-        public void testLdapAuthorizationUserRoles() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})")
-                    .put("searchguard.authentication.authorization.ldap.userrolename", "description").build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            final LdapUser user = new LdapUser("jacksonm", null);
-            new LDAPAuthorizator(settings).fillRoles(user, new AuthCredentials("jacksonm", null));
-            Assert.assertEquals(3, user.getRoles().size());
-            Assert.assertEquals(3, user.getRoleEntries().size());
-
-        }
-
-        @Test
-        public void testLdapAuthorizationNestedRoles() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})")
-                    .put("searchguard.authentication.authorization.ldap.resolve_nested_roles", true)
-
-                    .build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            final LdapUser user = new LdapUser("spock", null);
-            new LDAPAuthorizator(settings).fillRoles(user, new AuthCredentials("spock", null));
-            Assert.assertEquals(4, user.getRoles().size());
-            Assert.assertEquals(4, user.getRoleEntries().size());
-        }
-
-        @Test
-        public void testLdapAuthorizationNestedRolesCache() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})")
-                    .put("searchguard.authentication.authorization.ldap.resolve_nested_roles", true)
-
-                    .build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            LdapUser user = new LdapUser("spock", null);
-            final GuavaCachingAuthorizator gc = new GuavaCachingAuthorizator(new LDAPAuthorizator(settings), settings);
-            gc.fillRoles(user, new AuthCredentials("spock", null));
-            user = new LdapUser("spock", null);
-            gc.fillRoles(user, new AuthCredentials("spock", null));
-            Assert.assertEquals(4, user.getRoles().size());
-            Assert.assertEquals(4, user.getRoleEntries().size());
-        }
-
-        @Test
-        public void testLdapAuthorizationNestedRolesOff() throws Exception {
-            startLDAPServer();
-            final Settings settings = Settings.builder()
-                    .putArray("searchguard.authentication.ldap.host", "localhost:" + ldapServerPort)
-                    .put("searchguard.authentication.ldap.usersearch", "(uid={0})")
-                    .put("searchguard.authentication.authorization.ldap.rolename", "cn")
-                    .put("searchguard.authentication.authorization.ldap.rolesearch", "(uniqueMember={0})")
-                    .put("searchguard.authentication.authorization.ldap.resolve_nested_roles", false)
-
-                    .build();
-            //userrolename
-
-            //Role names may also be held as the values of an attribute in the user's directory entry. Use userRoleName to specify the name of this attribute.
-
-            ldapServer.applyLdif(SecurityUtil.getAbsoluteFilePathFromClassPath("ldif1.ldif"));
-            final LdapUser user = new LdapUser("spock", null);
-            new LDAPAuthorizator(settings).fillRoles(user, new AuthCredentials("spock", null));
-            Assert.assertEquals(2, user.getRoles().size());
-            Assert.assertEquals(2, user.getRoleEntries().size());
-
-        }*/
-    
-    
     public static File getAbsoluteFilePathFromClassPath(final String fileNameFromClasspath) {
         File file = null;
         final URL fileUrl = LdapBackendTest.class.getClassLoader().getResource(fileNameFromClasspath);
