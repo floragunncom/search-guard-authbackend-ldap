@@ -270,6 +270,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     @Override
     public void fillRoles(final User user, final AuthCredentials optionalAuthCreds) throws ElasticsearchSecurityException {
 
+        if(user == null) {
+            return;
+        }
+                
         String authenticatedUser;
         String originalUserName;
         
@@ -279,6 +283,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         } else {
             authenticatedUser =  Utils.escapeStringRfc2254(user.getName());
             originalUserName = user.getName();
+        }
+        
+        if(log.isTraceEnabled()) {
+            log.trace("user class: {}", user.getClass());
         }
 
         LdapEntry entry = null;
@@ -333,7 +341,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 }
 
                 if(log.isTraceEnabled()) {
-                    log.trace("User roles count: {}", userRolesDn.size());
+                    log.trace("User attr. roles count: {}", userRolesDn.size());
                 }
             }
 
@@ -367,7 +375,8 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             
 
             if(log.isTraceEnabled()) {
-                log.trace("non user roles count: {}", roles.size());
+                log.trace("non user attr. roles count: {}", roles.size());
+                log.trace("non user attr. roles {}", roles);
             }
 
             for (final Iterator<String> it = userRolesDn.iterator(); it.hasNext();) {
@@ -434,6 +443,11 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 if (user instanceof LdapUser) {
                     ((LdapUser) user).addRoleEntries(roles.values());
                 }
+            }
+            
+
+            if(log.isTraceEnabled()) {
+                log.trace("returned user: {}", user);
             }
 
         } catch (final Exception e) {
