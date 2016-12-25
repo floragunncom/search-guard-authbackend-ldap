@@ -312,6 +312,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 
                 entry = LDAPAuthenticationBackend.exists(user.getName(), connection, settings);
                 
+                if(log.isTraceEnabled()) {
+                    log.trace("{} is not a valid DN and was resolved to {}", authenticatedUser, entry);
+                }
+                
                 if (entry == null) {
                     throw new ElasticsearchSecurityException("No user " + authenticatedUser + " found");
                 }
@@ -331,26 +335,44 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             // this attribute.
             final String userRoleName = settings
                     .get(ConfigConstants.LDAP_AUTHZ_USERROLENAME, DEFAULT_USERROLENAME);
+            
+            if(log.isTraceEnabled()) {
+                log.trace("userRoleName: {}", userRoleName);
+            }
+            
             if (entry.getAttribute(userRoleName) != null) {
                 final Collection<String> userRoles = entry.getAttribute(userRoleName).getStringValues();
 
                 for (final String possibleRoleDN : userRoles) {
                     if (isValidDn(possibleRoleDN)) {
                         userRolesDn.add(possibleRoleDN);
+                    } else {
+                        if(log.isDebugEnabled()) {
+                            log.debug("Cannot add {} as a role because its not a valid dn", possibleRoleDN);
+                        }
                     }
                 }
 
                 if(log.isTraceEnabled()) {
                     log.trace("User attr. roles count: {}", userRolesDn.size());
+                    log.trace("User attr. roles {}", userRolesDn);
                 }
             }
 
             final Map<Tuple<String, LdapName>, LdapEntry> roles = new HashMap<Tuple<String, LdapName>, LdapEntry>();
             final String roleName = settings.get(ConfigConstants.LDAP_AUTHZ_ROLENAME, DEFAULT_ROLENAME);
+            
+            if(log.isTraceEnabled()) {
+                log.trace("roleName: {}", roleName);
+            }
 
             // replace {2}
-            final String userRoleAttribute = settings.get(ConfigConstants.LDAP_AUTHZ_USERROLEATTRIBUTE,
-                    null);
+            final String userRoleAttribute = settings.get(ConfigConstants.LDAP_AUTHZ_USERROLEATTRIBUTE, null);
+            
+            if(log.isTraceEnabled()) {
+                log.trace("userRoleAttribute: {}", userRoleAttribute);
+            }
+            
             String userRoleAttributeValue = null;
 
             if (userRoleAttribute != null) {
@@ -400,13 +422,13 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                         .hasNext();) {
                     final java.util.Map.Entry<Tuple<String, LdapName>, LdapEntry> _entry = iterator.next();
 
-                    final Set<LdapEntry> x = resolveNestedRoles(_entry.getKey(), connection, roleName);
+                    final Set<LdapEntry> nestedRoles = resolveNestedRoles(_entry.getKey(), connection, roleName);
 
                     if(log.isTraceEnabled()) {
-                        log.trace("{}. nested roles for {} {}", x.size(), _entry.getKey(), roleName);
+                        log.trace("{} nested roles for {} -> {}", nestedRoles.size(), _entry.getKey(), roleName);
                     }
 
-                    nestedReturn.addAll(x);
+                    nestedReturn.addAll(nestedRoles);
 
                 }
 
@@ -429,7 +451,6 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
                 for (final Iterator<LdapEntry> iterator = roles.values().iterator(); iterator.hasNext();) {
                     final LdapEntry entry2 = iterator.next();
-                    
                     final String role = getRoleFromAttribute(entry2, roleName);
                     
                     if(!Strings.isNullOrEmpty(role)) {
