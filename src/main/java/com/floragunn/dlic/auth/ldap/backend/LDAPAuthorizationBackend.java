@@ -66,11 +66,13 @@ import com.floragunn.dlic.auth.ldap.util.LdapHelper;
 import com.floragunn.dlic.auth.ldap.util.Utils;
 import com.floragunn.searchguard.auth.AuthorizationBackend;
 import com.floragunn.searchguard.ssl.util.SSLConfigConstants;
+import com.floragunn.searchguard.support.WildcardMatcher;
 import com.floragunn.searchguard.user.AuthCredentials;
 import com.floragunn.searchguard.user.User;
 
 public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
+    private static final String[] EMPTY_STRING_ARRAY = new String[0];
     static final String JKS = "JKS";
     static final String PKCS12 = "PKCS12";
     static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
@@ -246,7 +248,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
 
             //https://github.com/floragunncom/search-guard/issues/227
-            final String[] enabledCipherSuites = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, new String[0]);   
+            final String[] enabledCipherSuites = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, EMPTY_STRING_ARRAY);   
             final String[] enabledProtocols = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, new String[] { "TLSv1.1", "TLSv1.2" });   
             
 
@@ -287,6 +289,14 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         
         if(log.isTraceEnabled()) {
             log.trace("user class: {}", user.getClass());
+        }
+
+        final String[] skipUsers = settings.getAsArray(ConfigConstants.LDAP_AUTHZ_SKIP_USERS, EMPTY_STRING_ARRAY);
+        if (skipUsers.length > 0 && WildcardMatcher.matchAny(skipUsers, authenticatedUser)) {
+            if (log.isDebugEnabled()) {
+                log.debug("Skipped search roles of user {}", authenticatedUser);
+            }
+            return;
         }
 
         LdapEntry entry = null;
