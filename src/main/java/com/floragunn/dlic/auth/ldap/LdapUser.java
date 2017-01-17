@@ -39,10 +39,12 @@ public class LdapUser extends User {
         this.userEntry = userEntry;
     }
 
+    @Deprecated
     public void addRoleEntry(final LdapEntry entry) {
         roleEntries.add(entry);
     }
 
+    @Deprecated
     public void addRoleEntries(final Collection<LdapEntry> entries) {
         roleEntries.addAll(entries);
     }
@@ -59,11 +61,13 @@ public class LdapUser extends User {
         return originalUsername;
     }
 
+    @Deprecated
     public Set<LdapEntry> getRoleEntries() {
         return Collections.unmodifiableSet(roleEntries);
     }
 
     @Override
+    @Deprecated
     public void copyRolesFrom(final User user) {
         this.addRoleEntries(((LdapUser) user).getRoleEntries());
         super.copyRolesFrom(user);

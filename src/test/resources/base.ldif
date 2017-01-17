@@ -46,7 +46,6 @@ sn: jackson
 uid: jacksonm
 userpassword: secret
 mail: jacksonm@example.com
-description: cn=dummyempty,ou=groups,o=TEST
 ou: Human Resources
 
 dn: cn=Captain Spock,ou=people,o=TEST
@@ -56,7 +55,9 @@ sn: spock
 uid: spock
 userpassword: spocksecret
 mail: spock@example.com
-description: vulcan
+# no memberOf IOD registered, so we use 'description'
+description: cn=dummyempty,ou=groups,o=TEST
+description: cn=rolemo4,ou=groups,o=TEST
 ou: Human Resources
 
 dn: cn=Special\, Sign,ou=people,o=TEST
@@ -90,10 +91,28 @@ objectClass: groupOfUniqueNames
 cn: nested2
 uniqueMember: cn=Captain Spock,ou=people,o=TEST
 
+dn: cn=rolemo4,ou=groups,o=TEST
+objectClass: groupOfUniqueNames
+cn: rolemo4
+uniqueMember: cn=hnelson,ou=people,o=TEST
+description: cn=nested3,ou=groups,o=TEST
+
 dn: cn=dummyempty,ou=groups,o=TEST
 objectClass: groupOfUniqueNames
 cn: dummyempty
 uniqueMember: cn=krbtgt,ou=people,o=TEST
+
+dn: cn=nested3,ou=groups,o=TEST
+objectClass: groupOfUniqueNames
+cn: nested3
+uniqueMember: cn=krbtgt,ou=people,o=TEST
+
+dn: cn=nested4,ou=groups,o=TEST
+objectClass: groupOfUniqueNames
+cn: nested4
+uniqueMember: cn=nested3,ou=groups,o=TEST
+
+#krb
 
 dn: cn=hnelson,ou=people,o=TEST
 objectclass: inetOrgPerson
