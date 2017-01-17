@@ -27,6 +27,7 @@ public final class ConfigConstants {
     public static final String LDAP_AUTHZ_USERROLEATTRIBUTE = "userroleattribute";
     public static final String LDAP_AUTHZ_USERROLENAME = "userrolename";
     public static final String LDAP_AUTHZ_SKIP_USERS = "skip_users";
+    public static final String LDAP_AUTHZ_ROLESEARCH_ENABLED = "rolesearch_enabled";
     
     public static final String LDAP_HOSTS = "hosts";
     public static final String LDAP_BIND_DN = "bind_dn";

@@ -36,13 +36,13 @@ import java.util.Set;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.ElasticsearchSecurityException;
 import org.elasticsearch.SpecialPermission;
 import org.elasticsearch.common.Strings;
-import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.env.Environment;
 import org.ldaptive.BindRequest;
@@ -278,17 +278,27 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 
         String authenticatedUser;
         String originalUserName;
+        LdapEntry entry = null;
+        String dn = null;
         
         if(user instanceof LdapUser) {
-            authenticatedUser = ((LdapUser) user).getUserEntry().getDn(); 
+            entry = ((LdapUser) user).getUserEntry();
+            authenticatedUser = entry.getDn(); 
             originalUserName = ((LdapUser) user).getOriginalUsername();
         } else {
             authenticatedUser =  Utils.escapeStringRfc2254(user.getName());
             originalUserName = user.getName();
         }
         
+        final boolean rolesearchEnabled = settings.getAsBoolean(ConfigConstants.LDAP_AUTHZ_ROLESEARCH_ENABLED, true);
+
+        
         if(log.isTraceEnabled()) {
             log.trace("user class: {}", user.getClass());
+            log.trace("authenticatedUser: {}", authenticatedUser);
+            log.trace("originalUserName: {}", originalUserName);
+            log.trace("entry: {}", String.valueOf(entry));
+            log.trace("dn: {}", dn);
         }
 
         final String[] skipUsers = settings.getAsArray(ConfigConstants.LDAP_AUTHZ_SKIP_USERS, EMPTY_STRING_ARRAY);
@@ -298,51 +308,50 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
             return;
         }
-
-        LdapEntry entry = null;
-        String dn = null;
+       
         Connection connection = null;
 
         try {
 
-            connection = getConnection(settings);
-
-            if (isValidDn(authenticatedUser)) {
-                // assume dn
+            if(entry == null || dn == null) {
+            
+                connection = getConnection(settings);
+                
+                if (isValidDn(authenticatedUser)) {
+                    // assume dn
+                    if(log.isTraceEnabled()) {
+                        log.trace("{} is a valid DN", authenticatedUser);
+                    }
+                    
+                    entry = LdapHelper.lookup(connection, authenticatedUser);
+    
+                    if (entry == null) {
+                        throw new ElasticsearchSecurityException("No user '" + authenticatedUser + "' found");
+                    }
+    
+                } else {
+                    entry = LDAPAuthenticationBackend.exists(user.getName(), connection, settings);
+                    
+                    if(log.isTraceEnabled()) {
+                        log.trace("{} is not a valid DN and was resolved to {}", authenticatedUser, entry);
+                    }
+                    
+                    if (entry == null || entry.getDn() == null) {
+                        throw new ElasticsearchSecurityException("No user " + authenticatedUser + " found");
+                    }
+                }
+    
+                dn = entry.getDn();
+    
                 if(log.isTraceEnabled()) {
-                    log.trace("{} is a valid DN", authenticatedUser);
-                }
-                entry = LdapHelper.lookup(connection, authenticatedUser);
-
-                if (entry == null) {
-                    throw new ElasticsearchSecurityException("No user '" + authenticatedUser + "' found");
-                }
-
-            } else {
-                
-                entry = LDAPAuthenticationBackend.exists(user.getName(), connection, settings);
-                
-                if(log.isTraceEnabled()) {
-                    log.trace("{} is not a valid DN and was resolved to {}", authenticatedUser, entry);
-                }
-                
-                if (entry == null) {
-                    throw new ElasticsearchSecurityException("No user " + authenticatedUser + " found");
+                    log.trace("User found with DN {}", dn);
                 }
             }
 
-            dn = entry.getDn().toString();
-
-            if(log.isTraceEnabled()) {
-                log.trace("User found with DN {}", dn);
-            }
-
-            final Set<String> userRolesDn = new HashSet<String>();
+            final Set<LdapName> roles = new HashSet<LdapName>(150);
 
             // Roles as an attribute of the user entry
-            // Role names may also be held as the values of an attribute in the
-            // user's directory entry. Use userRoleName to specify the name of
-            // this attribute.
+            // default is userrolename: memberOf
             final String userRoleName = settings
                     .get(ConfigConstants.LDAP_AUTHZ_USERROLENAME, DEFAULT_USERROLENAME);
             
@@ -355,68 +364,64 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
                 for (final String possibleRoleDN : userRoles) {
                     if (isValidDn(possibleRoleDN)) {
-                        userRolesDn.add(possibleRoleDN);
+                        roles.add(new LdapName(possibleRoleDN));
                     } else {
                         if(log.isDebugEnabled()) {
                             log.debug("Cannot add {} as a role because its not a valid dn", possibleRoleDN);
                         }
                     }
                 }
-
-                if(log.isTraceEnabled()) {
-                    log.trace("User attr. roles count: {}", userRolesDn.size());
-                    log.trace("User attr. roles {}", userRolesDn);
-                }
+            }
+            
+            if(log.isTraceEnabled()) {
+                log.trace("User attr. roles count: {}", roles.size());
+                log.trace("User attr. roles {}", roles);
             }
 
-            final Map<Tuple<String, LdapName>, LdapEntry> roles = new HashMap<Tuple<String, LdapName>, LdapEntry>();
+            // The attribute in a role entry containing the name of that role, Default is "name".
+            // Can also be "dn" to use the full DN as rolename.
+            // rolename: name
             final String roleName = settings.get(ConfigConstants.LDAP_AUTHZ_ROLENAME, DEFAULT_ROLENAME);
             
             if(log.isTraceEnabled()) {
                 log.trace("roleName: {}", roleName);
             }
 
-            // replace {2}
-            final String userRoleAttribute = settings.get(ConfigConstants.LDAP_AUTHZ_USERROLEATTRIBUTE, null);
+            // Specify the name of the attribute which value should be substituted with {2}
+            // Substituted with an attribute value from user's directory entry, of the authenticated user
+            // userroleattribute: null
+            final String userRoleAttributeName = settings.get(ConfigConstants.LDAP_AUTHZ_USERROLEATTRIBUTE, null);
             
             if(log.isTraceEnabled()) {
-                log.trace("userRoleAttribute: {}", userRoleAttribute);
+                log.trace("userRoleAttribute: {}", userRoleAttributeName);
+                log.trace("rolesearch: {}", settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH));
             }
             
             String userRoleAttributeValue = null;
+            final LdapAttribute userRoleAttribute = entry.getAttribute(userRoleAttributeName);
 
             if (userRoleAttribute != null) {
-                userRoleAttributeValue = entry.getAttribute(userRoleAttribute) == null ? null : entry.getAttribute(userRoleAttribute)
-                        .getStringValue();
+                userRoleAttributeValue = userRoleAttribute.getStringValue();
             }
 
-            final List<LdapEntry> rolesResult = LdapHelper.search(
+            final List<LdapEntry> rolesResult = !rolesearchEnabled?null:LdapHelper.search(
                     connection,
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
                     .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, dn).replace(ONE_PLACEHOLDER, originalUserName)
                     .replace(TWO_PLACEHOLDER, userRoleAttributeValue == null ? TWO_PLACEHOLDER : userRoleAttributeValue), SearchScope.SUBTREE);
-
-            if(rolesResult != null) {
+            
+            if(rolesResult != null && !rolesResult.isEmpty()) {
                 for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
                     final LdapEntry searchResultEntry = iterator.next();
-                    roles.put(new Tuple<String, LdapName>(searchResultEntry.getDn().toString(), new LdapName(searchResultEntry.getDn())),
-                            searchResultEntry);
+                    roles.add(new LdapName(searchResultEntry.getDn()));
                 }
             }
-            
 
             if(log.isTraceEnabled()) {
-                log.trace("non user attr. roles count: {}", roles.size());
-                log.trace("non user attr. roles {}", roles);
-            }
-
-            for (final Iterator<String> it = userRolesDn.iterator(); it.hasNext();) {
-                final String stringVal = it.next();
-                // lookup
-                final LdapEntry userRole = LdapHelper.lookup(connection, stringVal);
-                roles.put(new Tuple<String, LdapName>(stringVal, null), userRole);
-
+                log.trace("non user attr. roles count: {}", rolesResult != null?rolesResult.size():0);
+                log.trace("non user attr. roles {}", rolesResult);
+                log.trace("roles count total {}", roles.size());
             }
 
             // nested roles
@@ -426,54 +431,48 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     log.trace("Evaluate nested roles");
                 }
 
-                final Set<LdapEntry> nestedReturn = new HashSet<LdapEntry>(roles.values());
+                final Set<LdapName> nestedReturn = new HashSet<LdapName>(roles);
 
-                for (final Iterator<java.util.Map.Entry<Tuple<String, LdapName>, LdapEntry>> iterator = roles.entrySet().iterator(); iterator
-                        .hasNext();) {
-                    final java.util.Map.Entry<Tuple<String, LdapName>, LdapEntry> _entry = iterator.next();
-
-                    final Set<LdapEntry> nestedRoles = resolveNestedRoles(_entry.getKey(), connection, roleName);
+                for (final LdapName roleLdapName: roles) {
+                    final Set<LdapName> nestedRoles = resolveNestedRoles(roleLdapName, connection, userRoleName, 0, rolesearchEnabled);
 
                     if(log.isTraceEnabled()) {
-                        log.trace("{} nested roles for {} -> {}", nestedRoles.size(), _entry.getKey(), roleName);
+                        log.trace("{} nested roles for {}", nestedRoles.size(), roleLdapName);
                     }
 
                     nestedReturn.addAll(nestedRoles);
-
                 }
 
-                for (final Iterator<LdapEntry> iterator = nestedReturn.iterator(); iterator.hasNext();) {
-                    final LdapEntry entry2 = iterator.next();
-                    final String role = getRoleFromAttribute(entry2, roleName);
+                for (final LdapName roleLdapName: nestedReturn) {
+                    final String role = getRoleFromAttribute(roleLdapName, roleName);
                     
                     if(!Strings.isNullOrEmpty(role)) {
                         user.addRole(role);
                     } else {
-                        log.warn("No or empty attribute '{}' for entry {}", roleName, entry2.getDn());
+                        log.warn("No or empty attribute '{}' for entry {}", roleName, roleLdapName);
                     }
                 }
 
+                /*
                 if (user instanceof LdapUser) {
                     ((LdapUser) user).addRoleEntries(nestedReturn);
-                }
+                }*/
 
             } else {
 
-                for (final Iterator<LdapEntry> iterator = roles.values().iterator(); iterator.hasNext();) {
-                    final LdapEntry entry2 = iterator.next();
-                    final String role = getRoleFromAttribute(entry2, roleName);
+                for (final LdapName roleLdapName: roles) {
+                    final String role = getRoleFromAttribute(roleLdapName, roleName);
                     
                     if(!Strings.isNullOrEmpty(role)) {
                         user.addRole(role);
                     } else {
-                        log.warn("No or empty attribute '{}' for entry {}", roleName, entry2.getDn());
+                        log.warn("No or empty attribute '{}' for entry {}", roleName, roleLdapName);
                     }
-
                 }
 
-                if (user instanceof LdapUser) {
+                /*if (user instanceof LdapUser) {
                     ((LdapUser) user).addRoleEntries(roles.values());
-                }
+                }*/
             }
             
 
@@ -492,99 +491,65 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
     }
 
-    protected Set<LdapEntry> resolveNestedRoles(final Tuple<String, LdapName> role, final Connection ldapConnection, final String roleName)
+    protected Set<LdapName> resolveNestedRoles(final LdapName roleDn, final Connection ldapConnection, String userRoleName, int depth, final boolean rolesearchEnabled)
             throws ElasticsearchSecurityException, LdapException {
+        depth++;
 
-        final Set<LdapEntry> result = new HashSet<LdapEntry>();
-        LdapName roleDn = null;
-        final boolean isRoleStringValidDn = isValidDn(role.v1());
+        final Set<LdapName> result = new HashSet<LdapName>(20);
 
-        if (role.v2() != null) {
-            roleDn = role.v2();
-        } else {
-            // lookup role
-            if (isRoleStringValidDn) {
+        final LdapEntry e0 = LdapHelper.lookup(ldapConnection, roleDn.toString());
+
+        if (e0.getAttribute(userRoleName) != null) {
+            final Collection<String> userRoles = e0.getAttribute(userRoleName).getStringValues();
+
+            for (final String possibleRoleDN : userRoles) {
+                if (isValidDn(possibleRoleDN)) {
+                    try {
+                        result.add(new LdapName(possibleRoleDN));
+                    } catch (InvalidNameException e) {
+                        // ignore
+                    }
+                } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Cannot add {} as a role because its not a valid dn", possibleRoleDN);
+                    }
+                }
+            }
+        }
+
+        if (log.isTraceEnabled()) {
+            log.trace("result nested attr count for depth {} : {}", depth, result.size());
+        }
+
+        final List<LdapEntry> rolesResult = !rolesearchEnabled?null:LdapHelper
+                .search(ldapConnection,
+                        settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
+                        settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
+                                .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, roleDn.toString())
+                                .replace(ONE_PLACEHOLDER, roleDn.toString()), SearchScope.SUBTREE);
+
+        if (log.isTraceEnabled()) {
+            log.trace("result nested search count for depth {}: {}", depth, rolesResult==null?0:rolesResult.size());
+        }
+
+        
+        if(rolesResult != null) {
+            for (final LdapEntry entry : rolesResult) {
                 try {
-                    roleDn = new LdapName(LdapHelper.lookup(ldapConnection, role.v1()).getDn());
+                    final LdapName dn = new LdapName(entry.getDn());
+                    result.add(dn);
                 } catch (final InvalidNameException e) {
                     throw new LdapException(e);
                 }
-            } else {
-
-                try {
-
-                    // search
-                    final List<LdapEntry> _result = LdapHelper.search(
-                            ldapConnection,
-                            settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
-                            settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH).replace(
-                                    ONE_PLACEHOLDER, role.v1()), SearchScope.SUBTREE);
-
-                    // one
-                    if (_result == null || _result.isEmpty()) {
-                        log.warn("Cannot resolve role '{}' (NOT FOUND)", role.v1());
-                    } else {
-
-                        //
-                        final LdapEntry entry = _result.get(0);
-                        roleDn = new LdapName(entry.getDn());
-
-                        if (_result.size() > 1) {
-                            log.warn("Cannot resolve role '{}' (MORE THAN ONE FOUND)", role.v1());
-                        }
-
-                    }
-                } catch (final InvalidNameException e) {
-                    // log.warn("Cannot resolve role '{}' (EXCEPTION: {})", e,
-                    // role.v1(), e.toString());
-                    throw new LdapException(e);
-                }
-
             }
-
         }
 
-        if(log.isTraceEnabled()) {
-            log.trace("role dn resolved to {}", roleDn);
-        }
-
-        final List<LdapEntry> rolesResult = LdapHelper.search(
-                ldapConnection,
-                settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
-                settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
-                .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, roleDn == null ? role.v1() : roleDn.toString()).replace(ONE_PLACEHOLDER, role.v1()), SearchScope.SUBTREE);
-
-        for (final Iterator<LdapEntry> iterator = rolesResult.iterator(); iterator.hasNext();) {
-            final LdapEntry searchResultEntry = iterator.next();
-            final String _role = getRoleFromAttribute(searchResultEntry, roleName);
-            
-            if(log.isTraceEnabled()) {
-                log.trace("nested l1 {} for {}", _role, searchResultEntry.getDn());
-            }
-            
-            //_role might be null
-            try {
-                final Set<LdapEntry> in = resolveNestedRoles(new Tuple<String, LdapName>(_role, new LdapName(searchResultEntry.getDn())),
-                        ldapConnection, roleName);
-
-                for (final Iterator<LdapEntry> iterator2 = in.iterator(); iterator2.hasNext();) {
-                    final LdapEntry entry = iterator2.next();
-                    result.add(entry);
-                    
-                    if(log.isTraceEnabled()) {
-                        log.trace("nested l2 {}", entry.getDn());
-                    }
-                }
-            } catch (final InvalidNameException e) {
-                throw new LdapException(e);
-            }
-
-            result.add(searchResultEntry);
-
+        for (final LdapName nm : new HashSet<LdapName>(result)) {
+            final Set<LdapName> in = resolveNestedRoles(nm, ldapConnection, userRoleName, depth, rolesearchEnabled);
+            result.addAll(in);
         }
 
         return result;
-
     }
 
     @Override
@@ -607,20 +572,27 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         return true;
     }
     
-    private String getRoleFromAttribute(final LdapEntry entry, final String role) {
+    private String getRoleFromAttribute(final LdapName ldapName, final String role) {
 
-        if (entry == null || Strings.isNullOrEmpty(role)) {
+        if (ldapName == null || Strings.isNullOrEmpty(role)) {
             return null;
         }
 
         if("dn".equalsIgnoreCase(role)) {
-            return entry.getDn();
+            return ldapName.toString();
         }
         
-        final LdapAttribute attr = entry.getAttribute(role);
+        List<Rdn> rdns = ldapName.getRdns();
         
-        if(attr != null) {
-            return attr.getStringValue();
+        for(Rdn rdn: rdns) {
+            if(role.equalsIgnoreCase(rdn.getType())) {
+                
+                if(rdn.getValue() == null) {
+                    return null;
+                }
+                
+                return String.valueOf(rdn.getValue());
+            }
         }
         
         return null;

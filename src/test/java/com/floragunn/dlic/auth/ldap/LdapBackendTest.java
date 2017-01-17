@@ -354,7 +354,6 @@ public class LdapBackendTest {
         Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
         Assert.assertEquals(2, user.getRoles().size());
         Assert.assertEquals("ceo", new ArrayList(new TreeSet(user.getRoles())).get(0));
-        Assert.assertEquals(2, user.getRoleEntries().size());
         Assert.assertEquals(user.getName(), user.getUserEntry().getDn());
     }
 
@@ -412,8 +411,6 @@ public class LdapBackendTest {
                 .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
                 .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "cn")
                 .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember=cn={1},ou=people,o=TEST)")
-                // .put("searchguard.authentication.authorization.ldap.userrolename",
-                // "(uniqueMember={0})")
                 .build();
 
         final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("Michael Jackson", "secret"
@@ -424,10 +421,8 @@ public class LdapBackendTest {
         Assert.assertNotNull(user);
         Assert.assertEquals("Michael Jackson", user.getOriginalUsername());
         Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getUserEntry().getDn());
-        System.out.println(user.getRoles());
         Assert.assertEquals(2, user.getRoles().size());
         Assert.assertEquals("ceo", new ArrayList(new TreeSet(user.getRoles())).get(0));
-        Assert.assertEquals(2, user.getRoleEntries().size());
         Assert.assertEquals(user.getName(), user.getUserEntry().getDn());
     }
     
@@ -478,7 +473,6 @@ public class LdapBackendTest {
         Assert.assertEquals("spock", user.getName());
         Assert.assertEquals(4, user.getRoles().size());
         Assert.assertEquals("nested1", new ArrayList(new TreeSet(user.getRoles())).get(1));
-        System.out.println(user.getRoles());
     }
     
     @Test
@@ -591,6 +585,62 @@ public class LdapBackendTest {
         Assert.assertEquals("cn=Michael Jackson,ou=people,o=TEST", user.getName());
         Assert.assertEquals(0, user.getRoles().size());
         Assert.assertEquals(user.getName(), user.getUserEntry().getDn());
+    }
+    
+    @Test
+    public void testLdapAuthorizationNestedAttr() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "cn")
+                .put(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, true)
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember={0})")
+                .put(ConfigConstants.LDAP_AUTHZ_USERROLENAME, "description") // no memberOf OID
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH_ENABLED, true)
+                .build();
+
+        final User user = new User("spock");
+
+        new LDAPAuthorizationBackend(settings).fillRoles(user, null);
+
+        Assert.assertNotNull(user);
+        Assert.assertEquals("spock", user.getName());
+        Assert.assertEquals(8, user.getRoles().size());
+        Assert.assertEquals("nested3", new ArrayList(new TreeSet(user.getRoles())).get(4));
+        Assert.assertEquals("rolemo4", new ArrayList(new TreeSet(user.getRoles())).get(7));
+    }
+    
+    @Test
+    public void testLdapAuthorizationNestedAttrNoRoleSearch() throws Exception {
+
+        startLDAPServer();
+
+        final Settings settings = Settings.builder()
+                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:" + EmbeddedLDAPServer.ldapPort)
+                .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
+                .put(ConfigConstants.LDAP_AUTHC_USERBASE, "ou=people,o=TEST")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "unused")
+                .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "cn")
+                .put(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, true)
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(((unused")
+                .put(ConfigConstants.LDAP_AUTHZ_USERROLENAME, "description") // no memberOf OID
+                .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH_ENABLED, false)
+                .build();
+
+        final User user = new User("spock");
+
+        new LDAPAuthorizationBackend(settings).fillRoles(user, null);
+
+        Assert.assertNotNull(user);
+        Assert.assertEquals("spock", user.getName());
+        Assert.assertEquals(3, user.getRoles().size());
+        Assert.assertEquals("nested3", new ArrayList(new TreeSet(user.getRoles())).get(1));
+        Assert.assertEquals("rolemo4", new ArrayList(new TreeSet(user.getRoles())).get(2));
     }
     
     @After
