@@ -43,10 +43,10 @@
   </distributionManagement>
 
   <properties>
-    <sg2.version>2.4.0.6</sg2.version>
-    <sgssl.version>2.4.0.16</sgssl.version>
+    <sg2.version>2.4.4.11</sg2.version>
+    <sgssl.version>2.4.4.20</sgssl.version>
     <apache.ds.version>2.0.0-M21</apache.ds.version>
-    <elasticsearch.version>2.4.0</elasticsearch.version>
+    <elasticsearch.version>2.4.4</elasticsearch.version>
     <dependency.locations.enabled>false</dependency.locations.enabled>
   </properties>
 
