@@ -27,6 +27,7 @@ import java.security.PrivilegedExceptionAction;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -423,6 +424,8 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 log.trace("non user attr. roles {}", rolesResult);
                 log.trace("roles count total {}", roles.size());
             }
+            
+            final String[] nestedRoleFilter = settings.getAsArray(ConfigConstants.LDAP_AUTHZ_NESTEDROLEFILTER, EMPTY_STRING_ARRAY);
 
             // nested roles
             if (settings.getAsBoolean(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, false)) {
@@ -434,7 +437,8 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 final Set<LdapName> nestedReturn = new HashSet<LdapName>(roles);
 
                 for (final LdapName roleLdapName: roles) {
-                    final Set<LdapName> nestedRoles = resolveNestedRoles(roleLdapName, connection, userRoleName, 0, rolesearchEnabled);
+
+                    final Set<LdapName> nestedRoles = resolveNestedRoles(roleLdapName, connection, userRoleName, 0, rolesearchEnabled, nestedRoleFilter);
 
                     if(log.isTraceEnabled()) {
                         log.trace("{} nested roles for {}", nestedRoles.size(), roleLdapName);
@@ -491,8 +495,19 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
     }
 
-    protected Set<LdapName> resolveNestedRoles(final LdapName roleDn, final Connection ldapConnection, String userRoleName, int depth, final boolean rolesearchEnabled)
+    protected Set<LdapName> resolveNestedRoles(final LdapName roleDn, final Connection ldapConnection, String userRoleName,
+            int depth, final boolean rolesearchEnabled, final String[] roleFilter)
             throws ElasticsearchSecurityException, LdapException {
+        
+        if(roleFilter.length > 0  && WildcardMatcher.matchAny(roleFilter, roleDn.toString())) {
+            
+            if(log.isTraceEnabled()) {
+                log.trace("Filter nested role {}", roleDn);
+            }
+            
+            return Collections.emptySet();
+        }
+              
         depth++;
 
         final Set<LdapName> result = new HashSet<LdapName>(20);
@@ -545,7 +560,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         }
 
         for (final LdapName nm : new HashSet<LdapName>(result)) {
-            final Set<LdapName> in = resolveNestedRoles(nm, ldapConnection, userRoleName, depth, rolesearchEnabled);
+            final Set<LdapName> in = resolveNestedRoles(nm, ldapConnection, userRoleName, depth, rolesearchEnabled, roleFilter);
             result.addAll(in);
         }
 
