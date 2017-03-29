@@ -20,7 +20,8 @@ import java.security.PrivilegedExceptionAction;
 import java.util.StringTokenizer;
 
 import org.elasticsearch.SpecialPermission;
-import org.ldaptive.Connection;
+
+import com.unboundid.ldap.sdk.LDAPConnection;
 
 public final class Utils {
 
@@ -30,28 +31,12 @@ public final class Utils {
         
     }
     
-    public static void unbindAndCloseSilently(final Connection connection) {
+    public static void unbindAndCloseSilently(final LDAPConnection connection) {
         if (connection == null) {
             return;
         }
         
-        final SecurityManager sm = System.getSecurityManager();
-
-        if (sm != null) {
-            sm.checkPermission(new SpecialPermission());
-        }
-
-        try {
-             AccessController.doPrivileged(new PrivilegedExceptionAction<Object>() {
-                @Override
-                public Object run() throws Exception {
-                    connection.close();
-                    return null;
-                }
-            });
-        } catch (PrivilegedActionException e) {
-         // ignore
-        }
+        connection.close();
     }
     
     /**

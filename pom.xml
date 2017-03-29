@@ -23,7 +23,7 @@
 
   <groupId>com.floragunn</groupId>
   <artifactId>dlic-search-guard-authbackend-ldap</artifactId>
-  <version>5.0-8-SNAPSHOT</version>
+  <version>5.0-8-unb-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Search Guard</name>
@@ -106,11 +106,27 @@
       </exclusions>
     </dependency>
 
-    <dependency>
+   <!--  <dependency>
       <groupId>com.floragunn</groupId>
       <artifactId>ldaptive</artifactId>
       <version>1.1.0-fg-fork1</version>
       <exclusions>
+        <exclusion>
+          <artifactId>commons-cli</artifactId>
+          <groupId>commons-cli</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>slf4j-api</artifactId>
+          <groupId>org.slf4j</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency> -->
+    
+    <dependency>
+        <groupId>com.unboundid</groupId>
+        <artifactId>unboundid-ldapsdk</artifactId>
+        <version>3.2.1</version>
+        <exclusions>
         <exclusion>
           <artifactId>commons-cli</artifactId>
           <groupId>commons-cli</groupId>
@@ -169,18 +185,6 @@
       </exclusions>
     </dependency>
 
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
-      <version>1.7.21</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>slf4j-api</artifactId>
-          <groupId>org.slf4j</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
   </dependencies>  
 
   <build>

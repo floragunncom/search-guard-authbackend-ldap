@@ -14,14 +14,8 @@
 
 package com.floragunn.dlic.auth.ldap;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.ldaptive.LdapEntry;
-
 import com.floragunn.searchguard.user.User;
+import com.unboundid.ldap.sdk.SearchResultEntry;
 
 public class LdapUser extends User {
 
@@ -29,47 +23,24 @@ public class LdapUser extends User {
      * 
      */
     private static final long serialVersionUID = 1L;
-    private final LdapEntry userEntry;
-    private final Set<LdapEntry> roleEntries = new HashSet<>();
+    private final transient SearchResultEntry userEntry;
     private final String originalUsername;
 
-    public LdapUser(final String name, String originalUsername, final LdapEntry userEntry) {
+    public LdapUser(final String name, String originalUsername, final SearchResultEntry userEntry) {
         super(name);
         this.originalUsername = originalUsername;
         this.userEntry = userEntry;
     }
 
-    @Deprecated
-    public void addRoleEntry(final LdapEntry entry) {
-        roleEntries.add(entry);
-    }
-
-    @Deprecated
-    public void addRoleEntries(final Collection<LdapEntry> entries) {
-        roleEntries.addAll(entries);
-    }
-
-    public LdapEntry getUserEntry() {
+    public SearchResultEntry getUserEntry() {
         return userEntry;
     }
     
     public String getDn() {
-        return userEntry.getDn();
+        return userEntry.getDN();
     }
 
     public String getOriginalUsername() {
         return originalUsername;
-    }
-
-    @Deprecated
-    public Set<LdapEntry> getRoleEntries() {
-        return Collections.unmodifiableSet(roleEntries);
-    }
-
-    @Override
-    @Deprecated
-    public void copyRolesFrom(final User user) {
-        this.addRoleEntries(((LdapUser) user).getRoleEntries());
-        super.copyRolesFrom(user);
     }
 }

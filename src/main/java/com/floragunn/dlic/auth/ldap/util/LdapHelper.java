@@ -14,48 +14,37 @@
 
 package com.floragunn.dlic.auth.ldap.util;
 
-import java.util.ArrayList;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.List;
 
-import org.ldaptive.Connection;
-import org.ldaptive.DerefAliases;
-import org.ldaptive.LdapEntry;
-import org.ldaptive.LdapException;
-import org.ldaptive.Response;
-import org.ldaptive.SearchOperation;
-import org.ldaptive.SearchRequest;
-import org.ldaptive.SearchResult;
-import org.ldaptive.SearchScope;
-import org.ldaptive.referral.SearchReferralHandler;
+import org.elasticsearch.SpecialPermission;
+
+import com.unboundid.ldap.sdk.DereferencePolicy;
+import com.unboundid.ldap.sdk.LDAPConnection;
+import com.unboundid.ldap.sdk.LDAPException;
+import com.unboundid.ldap.sdk.ResultCode;
+import com.unboundid.ldap.sdk.SearchRequest;
+import com.unboundid.ldap.sdk.SearchResult;
+import com.unboundid.ldap.sdk.SearchResultEntry;
+import com.unboundid.ldap.sdk.SearchScope;
 
 public class LdapHelper {
 
-    public static List<LdapEntry> search(final Connection conn, final String baseDn, final String filter, final SearchScope searchScope,
-            final String... attributes) throws LdapException {
+    public static List<SearchResultEntry> search(final LDAPConnection conn, final String baseDn, final String filter,
+            final SearchScope searchScope, final String... attributes) throws LDAPException {
 
-        final List<LdapEntry> entries = new ArrayList<>();
-        final SearchRequest request = new SearchRequest(baseDn, filter);
-        request.setReferralHandler(new SearchReferralHandler());
-        request.setSearchScope(searchScope);
-        request.setDerefAliases(DerefAliases.ALWAYS);
-        request.setReturnAttributes(attributes);
-        final SearchOperation search = new SearchOperation(conn);
-        // referrals will be followed to build the response
-        final Response<SearchResult> r = search.execute(request);
-        final org.ldaptive.SearchResult result = r.getResult();
-        entries.addAll(result.getEntries());
-        return entries;
+        final SearchRequest searchRequest = new SearchRequest(baseDn, SearchScope.SUB, DereferencePolicy.ALWAYS, 0, 0, false,
+                filter, attributes);
+        searchRequest.setFollowReferrals(Boolean.TRUE);
+        final SearchResult searchResult = conn.search(searchRequest);
+        return searchResult.getSearchEntries();
+
     }
 
-    public static LdapEntry lookup(final Connection conn, final String dn) throws LdapException {
-
-        final List<LdapEntry> entries = search(conn, dn, "(objectClass=*)", SearchScope.OBJECT);
-
-        if (entries.size() == 1) {
-            return entries.get(0);
-        } else {
-            return null;
-        }
+    public static SearchResultEntry lookup(final LDAPConnection conn, final String dn) throws LDAPException {
+        return conn.getEntry(dn);
     }
 
 }

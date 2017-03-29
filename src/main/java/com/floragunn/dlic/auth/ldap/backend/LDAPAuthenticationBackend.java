@@ -19,21 +19,16 @@ import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import org.elasticsearch.ElasticsearchSecurityException;
-import org.elasticsearch.SpecialPermission;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.elasticsearch.ElasticsearchSecurityException;
+import org.elasticsearch.ExceptionsHelper;
+import org.elasticsearch.SpecialPermission;
 import org.elasticsearch.common.settings.Settings;
-import org.ldaptive.BindRequest;
-import org.ldaptive.Connection;
-import org.ldaptive.Credential;
-import org.ldaptive.LdapEntry;
-import org.ldaptive.LdapException;
-import org.ldaptive.Response;
-import org.ldaptive.SearchScope;
 
 import com.floragunn.dlic.auth.ldap.LdapUser;
 import com.floragunn.dlic.auth.ldap.util.ConfigConstants;
@@ -42,6 +37,9 @@ import com.floragunn.dlic.auth.ldap.util.Utils;
 import com.floragunn.searchguard.auth.AuthenticationBackend;
 import com.floragunn.searchguard.user.AuthCredentials;
 import com.floragunn.searchguard.user.User;
+import com.unboundid.ldap.sdk.LDAPConnection;
+import com.unboundid.ldap.sdk.SearchResultEntry;
+import com.unboundid.ldap.sdk.SearchScope;
 
 public class LDAPAuthenticationBackend implements AuthenticationBackend {
 
@@ -61,11 +59,29 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
         this.settings = settings;
     }
     
-
     @Override
     public User authenticate(final AuthCredentials authCreds) throws ElasticsearchSecurityException {
+        final SecurityManager sm = System.getSecurityManager();
 
-        Connection ldapConnection = null;
+        if (sm != null) {
+            sm.checkPermission(new SpecialPermission());
+        }
+        
+        try {
+            return AccessController.doPrivileged(new PrivilegedExceptionAction<User>() {
+                @Override
+                public User run() throws Exception {
+                    return authenticate0(authCreds);
+                }
+            });
+        } catch (PrivilegedActionException e) {
+            throw (ElasticsearchSecurityException) e.getException();
+        }
+    }
+
+    private User authenticate0(final AuthCredentials authCreds) throws ElasticsearchSecurityException {
+
+        LDAPConnection ldapConnection = null;
         final String user = Utils.escapeStringRfc2254(authCreds.getUsername());
         byte[] password = authCreds.getPassword();
 
@@ -73,49 +89,51 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
 
             ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
 
-            LdapEntry entry = exists(user, ldapConnection, settings);
+            SearchResultEntry entry = exists(user, ldapConnection, settings);
 
             //fake a user that no exists
             //makes guessing if a user exists or not harder when looking on the authentication delay time
             if(entry == null && settings.getAsBoolean(ConfigConstants.LDAP_FAKE_LOGIN_ENABLED, false)) {                
                 String fakeLognDn = settings.get(ConfigConstants.LDAP_FAKE_LOGIN_DN, "CN=faketomakebindfail,DC="+UUID.randomUUID().toString());
-                entry = new LdapEntry(fakeLognDn);
+                entry = new SearchResultEntry(fakeLognDn, Collections.EMPTY_LIST);
                 password = settings.get(ConfigConstants.LDAP_FAKE_LOGIN_Password, "fakeLoginPwd123").getBytes(StandardCharsets.UTF_8);
             } else if(entry == null) {
                 throw new ElasticsearchSecurityException("No user " + user + " found");
             }
             
-            final String dn = entry.getDn();
+            final String dn = entry.getDN();
 
             if(log.isTraceEnabled()) {
                 log.trace("Try to authenticate dn {}", dn);
             }
 
-            final BindRequest br = new BindRequest(dn, new Credential(password));
+            
+            ldapConnection.bind(dn, new String(password, StandardCharsets.UTF_8));
+            
             final SecurityManager sm = System.getSecurityManager();
 
             if (sm != null) {
                 sm.checkPermission(new SpecialPermission());
             }
             
-            final Connection _con = ldapConnection;
+            /*final LDAPConnection _con = ldapConnection;
             
             try {
                 AccessController.doPrivileged(new PrivilegedExceptionAction<Response<Void>>() {
                     @Override
-                    public Response<Void> run() throws LdapException {
+                    public Response<Void> run() throws LDAPException {
                         return _con.reopen(br);
                     }
                 });
             } catch (PrivilegedActionException e) {
                 throw e.getException();
-            }
+            }*/
 
             final String usernameAttribute = settings.get(ConfigConstants.LDAP_AUTHC_USERNAME_ATTRIBUTE, null);
             String username = dn;
 
             if (usernameAttribute != null && entry.getAttribute(usernameAttribute) != null) {
-                username = entry.getAttribute(usernameAttribute).getStringValue();
+                username = entry.getAttribute(usernameAttribute).getValue();
             }
 
             if(log.isDebugEnabled()) {
@@ -141,14 +159,33 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     public String getType() {
         return "ldap";
     }
-
+    
     @Override
     public boolean exists(final User user) {
-        Connection ldapConnection = null;
+        final SecurityManager sm = System.getSecurityManager();
+
+        if (sm != null) {
+            sm.checkPermission(new SpecialPermission());
+        }
+        
+        try {
+            return AccessController.doPrivileged(new PrivilegedExceptionAction<Boolean>() {
+                @Override
+                public Boolean run() throws Exception {
+                    return exists0(user);
+                }
+            });
+        } catch (PrivilegedActionException e) {
+            throw ExceptionsHelper.convertToElastic(e.getException());
+        }
+    }
+
+    private boolean exists0(final User user) {
+        LDAPConnection ldapConnection = null;
         String userName = user.getName();
         
         if(user instanceof LdapUser) {
-            userName = ((LdapUser) user).getUserEntry().getDn(); 
+            userName = ((LdapUser) user).getUserEntry().getDN(); 
         }
 
         try {
@@ -165,13 +202,13 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
         }
     }
     
-    static LdapEntry exists(final String user, Connection ldapConnection, Settings settings) throws Exception {
+    static SearchResultEntry exists(final String user, LDAPConnection ldapConnection, Settings settings) throws Exception {
         final String username = Utils.escapeStringRfc2254(user);
 
-        final List<LdapEntry> result = LdapHelper.search(ldapConnection,
+        final List<SearchResultEntry> result = LdapHelper.search(ldapConnection,
                 settings.get(ConfigConstants.LDAP_AUTHC_USERBASE, DEFAULT_USERBASE),
                 settings.get(ConfigConstants.LDAP_AUTHC_USERSEARCH, DEFAULT_USERSEARCH_PATTERN).replace(ZERO_PLACEHOLDER, username),
-                SearchScope.SUBTREE);
+                SearchScope.SUB);
 
         if (result == null || result.isEmpty()) {
             log.debug("No user " + username + " found");
