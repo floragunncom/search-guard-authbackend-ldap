@@ -54,37 +54,14 @@ public class EmbeddedLDAPServer {
 
     private DirectoryService directoryService;
     private LdapServer ldapServer;
-    // private KdcServer kdcServer;
     public final static int ldapPort = 40622;
     public final static int ldapsPort = 40623;
-    // private final static int kdcPort = 40624;
 
     private SchemaManager schemaManager;
 
     public static void main(final String[] args) throws Exception {
         new EmbeddedLDAPServer().start();
     }
-
-    /*public void createKeytab(final String principalName, final String passPhrase, final File keytabFile) throws IOException {
-        final KerberosTime timeStamp = new KerberosTime();
-        final int principalType = 1; // KRB5_NT_PRINCIPAL
-
-        final Keytab keytab = keytabFile.exists() ? Keytab.read(keytabFile) : Keytab.getInstance();
-
-        final List<KeytabEntry> entries = new ArrayList<KeytabEntry>();
-        for (final Map.Entry<EncryptionType, EncryptionKey> keyEntry : KerberosKeyFactory.getKerberosKeys(principalName, passPhrase)
-                .entrySet()) {
-            final EncryptionKey key = keyEntry.getValue();
-            final byte keyVersion = (byte) key.getKeyVersion();
-            entries.add(new KeytabEntry(principalName, principalType, timeStamp, keyVersion, key));
-        }
-
-        entries.addAll(keytab.getEntries());
-
-        keytab.setEntries(entries);
-        keytab.write(keytabFile);
-        log.debug("Keytab with " + keytab.getEntries().size() + " entries written to " + keytabFile.getAbsolutePath());
-    }*/
 
     @CreateDS(name = "ExampleComDS", allowAnonAccess = true, partitions = { @CreatePartition(name = "examplecom", suffix = "o=TEST", contextEntry = @ContextEntry(entryLdif = "dn: o=TEST\n"
             + "dc: TEST\n" + "objectClass: top\n" + "objectClass: domain\n\n"), indexes = { @CreateIndex(attribute = "objectClass"),
@@ -102,18 +79,9 @@ public class EmbeddedLDAPServer {
             @SaslMechanism(name = SupportedSaslMechanisms.GSS_SPNEGO, implClass = NtlmMechanismHandler.class) }, extendedOpHandlers = { StartTlsHandler.class }
 
             )
-    // @CreateKdcServer(primaryRealm = "example.com", kdcPrincipal =
-    // "krbtgt/example.com@example.com", searchBaseDn = "o=TEST",
-    // maxTicketLifetime = 1000,
-    // maxRenewableLifetime = 2000,
-    // transports = { @CreateTransport(protocol = "TCP", port = kdcPort),
-    // @CreateTransport(protocol = "UDP", port = kdcPort) })
     public void start() throws Exception {
 
         directoryService = DSAnnotationProcessor.getDirectoryService();
-        // kdcServer = ServerAnnotationProcessor.getKdcServer(directoryService,
-        // kdcPort);
-        // kdcServer.getConfig().setPaEncTimestampRequired(false);
         schemaManager = directoryService.getSchemaManager();
         final CreateLdapServer cl = (CreateLdapServer) AnnotationUtils.getInstance(CreateLdapServer.class);
         ldapServer = ServerAnnotationProcessor.instantiateLdapServer(cl, directoryService);
@@ -138,7 +106,6 @@ public class EmbeddedLDAPServer {
             throw new IllegalStateException("Service is not running");
         }
 
-        // kdcServer.stop();
         directoryService.shutdown();
         ldapServer.stop();
 

@@ -19,6 +19,7 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.StringTokenizer;
 
+import org.apache.logging.log4j.LogManager;
 import org.elasticsearch.SpecialPermission;
 import org.ldaptive.Connection;
 
@@ -26,7 +27,15 @@ public final class Utils {
 
     private static final String RFC2254_ESCAPE_CHARS = "\\*()\000";
     
+    static {
+        printLicenseInfo();
+    }
+    
     private Utils() {
+        
+    }
+    
+    public static void init() {
         
     }
     
@@ -95,13 +104,30 @@ public final class Utils {
         return out.toString();
     }    
 
-    public static void printLicenseInfo() {
-        System.out.println("*************************************");
-        System.out.println("Searchguard LDAP is not free software");
-        System.out.println("for commercial use in production.");
-        System.out.println("You have to obtain a license if you ");
-        System.out.println("use it in production.");
-        System.out.println("*************************************");
+    private static void printLicenseInfo() {
+        final StringBuilder sb = new StringBuilder();
+        sb.append("******************************************************"+System.lineSeparator());
+        sb.append("Search Guard LDAP is not free software"+System.lineSeparator());
+        sb.append("for commercial use in production."+System.lineSeparator());
+        sb.append("You have to obtain a license if you "+System.lineSeparator());
+        sb.append("use it in production."+System.lineSeparator());
+        sb.append(System.lineSeparator());
+        sb.append("See https://floragunn.com/searchguard-validate-license"+System.lineSeparator());
+        sb.append("In case of any doubt mail to <sales@floragunn.com>"+System.lineSeparator());
+        sb.append("*****************************************************");
+        
+        final String licenseInfo = sb.toString();
+        
+        if(!Boolean.getBoolean("sg.display_lic_none")) {
+            
+            if(!Boolean.getBoolean("sg.display_lic_only_stdout")) {
+                LogManager.getLogger(Utils.class).warn(licenseInfo);
+                System.err.println(licenseInfo);
+            }
+    
+            System.out.println(licenseInfo);
+        }
+        
     }
 
 }
