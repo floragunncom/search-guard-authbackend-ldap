@@ -121,6 +121,14 @@ public final class PemKeyReader {
         }
         return getPrivateKeyFromByteBuffer(PemKeyReader.readPrivateKey(keyFile), keyPassword);
     }
+    
+    public static PrivateKey toPrivateKey(InputStream in, String keyPassword) throws NoSuchAlgorithmException, NoSuchPaddingException,
+            InvalidKeySpecException, InvalidAlgorithmParameterException, KeyException, IOException {
+        if (in == null) {
+            return null;
+        }
+        return getPrivateKeyFromByteBuffer(PemKeyReader.readPrivateKey(in), keyPassword);
+    }
 
     private static PrivateKey getPrivateKeyFromByteBuffer(byte[] encodedKey, String keyPassword) throws NoSuchAlgorithmException,
             NoSuchPaddingException, InvalidKeySpecException, InvalidAlgorithmParameterException, KeyException, IOException {

@@ -14,10 +14,13 @@
 
 package com.floragunn.dlic.auth.ldap.backend;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Paths;
@@ -234,6 +237,16 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         }
     }
     
+    private static InputStream resolveStream(String propName, Settings settings) {
+        final String content = settings.get(propName, null);
+        
+        if(content == null) {
+            return null;
+        }
+
+        return new ByteArrayInputStream(content.getBytes(StandardCharsets.US_ASCII));
+    }
+    
     private static String resolve(String propName, Settings settings, boolean mustBeValid) {
         
         final String originalPath = settings.get(propName, null);
@@ -257,7 +270,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         return path;
     }
     
-    private static PrivateKey loadKey(String password, String keyFile) throws Exception {
+    private static PrivateKey loadKeyFromFile(String password, String keyFile) throws Exception {
         
         if(keyFile == null) {
             return null;
@@ -266,7 +279,16 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         return PemKeyReader.toPrivateKey(new File(keyFile), password);
     }
     
-    private static X509Certificate[] loadCertificates(String file) throws Exception {
+    private static PrivateKey loadKeyFromStream(String password, InputStream in) throws Exception {
+        
+        if(in == null) {
+            return null;
+        }
+        
+        return PemKeyReader.toPrivateKey(in, password);
+    }
+    
+    private static X509Certificate[] loadCertificatesFromFile(String file) throws Exception {
         if(file == null) {
             return null;
         }
@@ -284,7 +306,23 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         
     }
     
-    private static X509Certificate loadCertificate(String file) throws Exception {
+    private static X509Certificate[] loadCertificatesFromStream(InputStream in) throws Exception {
+        if(in == null) {
+            return null;
+        }
+        
+        CertificateFactory fact = CertificateFactory.getInstance("X.509");
+        Collection<? extends Certificate> certs = fact.generateCertificates(in);
+        X509Certificate[] x509Certs = new X509Certificate[certs.size()];
+        int i=0;
+        for(Certificate cert: certs) {
+            x509Certs[i++] = (X509Certificate) cert;
+        }
+        return x509Certs;
+        
+    }
+    
+    private static X509Certificate loadCertificateFromFile(String file) throws Exception {
         if(file == null) {
             return null;
         }
@@ -293,6 +331,15 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         try(FileInputStream is = new FileInputStream(file)) {
             return (X509Certificate) fact.generateCertificate(is);
         }
+    }
+    
+    private static X509Certificate loadCertificateFromStream(InputStream in) throws Exception {
+        if(in == null) {
+            return null;
+        }
+        
+        CertificateFactory fact = CertificateFactory.getInstance("X.509");
+        return (X509Certificate) fact.generateCertificate(in);
     }
     
     private static KeyStore loadKeyStore(String storePath, String keyStorePassword, String type) throws Exception {
@@ -324,16 +371,31 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 props.put("jndi.starttls.allowAnyHostname", "true");
             }
             
-            final boolean pem = settings.get(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, null) != null;
+            final boolean pem = settings.get(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, null) != null
+                    || settings.get(ConfigConstants.LDAPS_PEMTRUSTEDCAS_CONTENT, null) != null;
             
             final SslConfig sslConfig = new SslConfig();
             CredentialConfig cc;
             
             if(pem) {
-                final X509Certificate[] trustCertificates = loadCertificates(resolve(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, settings, true));
-                //for client authentication
-                final X509Certificate authenticationCertificate = loadCertificate(resolve(ConfigConstants.LDAPS_PEMCERT_FILEPATH, settings, enableClientAuth));
-                final PrivateKey authenticationKey = loadKey(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolve(ConfigConstants.LDAPS_PEMKEY_FILEPATH, settings, enableClientAuth));    
+                X509Certificate[] trustCertificates = loadCertificatesFromStream(resolveStream(ConfigConstants.LDAPS_PEMTRUSTEDCAS_CONTENT, settings));
+                
+                if(trustCertificates == null) {
+                    trustCertificates = loadCertificatesFromFile(resolve(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, settings, true));
+                }
+                    //for client authentication
+                X509Certificate authenticationCertificate = loadCertificateFromStream(resolveStream(ConfigConstants.LDAPS_PEMCERT_CONTENT, settings));
+                
+                if(authenticationCertificate == null) {
+                    authenticationCertificate = loadCertificateFromFile(resolve(ConfigConstants.LDAPS_PEMCERT_FILEPATH, settings, enableClientAuth));
+                }
+                
+                PrivateKey authenticationKey = loadKeyFromStream(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolveStream(ConfigConstants.LDAPS_PEMKEY_CONTENT, settings));
+                
+                if(authenticationKey == null) {
+                    authenticationKey = loadKeyFromFile(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolve(ConfigConstants.LDAPS_PEMKEY_FILEPATH, settings, enableClientAuth));    
+                }
+
                 cc = CredentialConfigFactory.createX509CredentialConfig(trustCertificates, authenticationCertificate, authenticationKey);
                 
                 if(log.isDebugEnabled()) {

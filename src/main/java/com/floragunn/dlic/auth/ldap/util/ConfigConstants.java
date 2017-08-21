@@ -49,9 +49,12 @@ public final class ConfigConstants {
     public static final String LDAPS_JKS_TRUST_ALIAS = "ca_alias";
     
     public static final String LDAPS_PEMKEY_FILEPATH = "pemkey_filepath";
+    public static final String LDAPS_PEMKEY_CONTENT = "pemkey_content";
     public static final String LDAPS_PEMKEY_PASSWORD = "pemkey_password";
     public static final String LDAPS_PEMCERT_FILEPATH = "pemcert_filepath";
+    public static final String LDAPS_PEMCERT_CONTENT = "pemcert_content";
     public static final String LDAPS_PEMTRUSTEDCAS_FILEPATH = "pemtrustedcas_filepath";
+    public static final String LDAPS_PEMTRUSTEDCAS_CONTENT = "pemtrustedcas_content";
 
     
     
