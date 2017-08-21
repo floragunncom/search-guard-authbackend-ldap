@@ -14,9 +14,13 @@
 
 package com.floragunn.dlic.auth.ldap.util;
 
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.elasticsearch.SpecialPermission;
 import org.ldaptive.Connection;
 import org.ldaptive.DerefAliases;
 import org.ldaptive.LdapEntry;
@@ -33,18 +37,33 @@ public class LdapHelper {
     public static List<LdapEntry> search(final Connection conn, final String baseDn, final String filter, final SearchScope searchScope,
             final String... attributes) throws LdapException {
 
-        final List<LdapEntry> entries = new ArrayList<>();
-        final SearchRequest request = new SearchRequest(baseDn, filter);
-        request.setReferralHandler(new SearchReferralHandler());
-        request.setSearchScope(searchScope);
-        request.setDerefAliases(DerefAliases.ALWAYS);
-        request.setReturnAttributes(attributes);
-        final SearchOperation search = new SearchOperation(conn);
-        // referrals will be followed to build the response
-        final Response<SearchResult> r = search.execute(request);
-        final org.ldaptive.SearchResult result = r.getResult();
-        entries.addAll(result.getEntries());
-        return entries;
+        final SecurityManager sm = System.getSecurityManager();
+
+        if (sm != null) {
+            sm.checkPermission(new SpecialPermission());
+        }
+        
+        try {
+            return AccessController.doPrivileged(new PrivilegedExceptionAction<List<LdapEntry>>() {
+                @Override
+                public List<LdapEntry> run() throws Exception {
+                    final List<LdapEntry> entries = new ArrayList<>();
+                    final SearchRequest request = new SearchRequest(baseDn, filter);
+                    request.setReferralHandler(new SearchReferralHandler());
+                    request.setSearchScope(searchScope);
+                    request.setDerefAliases(DerefAliases.ALWAYS);
+                    request.setReturnAttributes(attributes);
+                    final SearchOperation search = new SearchOperation(conn);
+                    // referrals will be followed to build the response
+                    final Response<SearchResult> r = search.execute(request);
+                    final org.ldaptive.SearchResult result = r.getResult();
+                    entries.addAll(result.getEntries());
+                    return entries;
+                }
+            });
+        } catch (PrivilegedActionException e) {
+            throw new LdapException(e);
+        }
     }
 
     public static LdapEntry lookup(final Connection conn, final String dn) throws LdapException {
