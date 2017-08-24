@@ -86,10 +86,10 @@
       <scope>provided</scope>
     </dependency>
     
-    <dependency>
+   <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
-      <version>2.6.2</version>
+      <version>2.8.2</version>
       <scope>provided</scope>
     </dependency>
 
@@ -122,23 +122,23 @@
       </exclusions>
     </dependency>
     
-    <dependency>
+   <!--<dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <version>1.7.21</version>
-    </dependency> 
-    
+      <version>1.7.25</version>
+    </dependency>  -->
+
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-slf4j-impl</artifactId>
-      <version>2.6.2</version>
+      <version>2.8.2</version>
       <exclusions>
         <exclusion>
          <groupId>org.apache.logging.log4j</groupId>
          <artifactId>log4j-api</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
+    </dependency> 
 
     <!-- Only test scoped dependencies hereafter -->
 
@@ -169,7 +169,7 @@
       </exclusions>
     </dependency>
 
-    <dependency>
+    <!-- <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
       <version>1.7.21</version>
@@ -180,7 +180,7 @@
           <groupId>org.slf4j</groupId>
         </exclusion>
       </exclusions>
-    </dependency>
+    </dependency> -->
   </dependencies>  
 
   <build>

@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.elasticsearch.common.settings.Settings;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.floragunn.dlic.auth.ldap.backend.LDAPAuthenticationBackend;
@@ -29,7 +30,12 @@ import com.floragunn.dlic.auth.ldap.util.ConfigConstants;
 import com.floragunn.searchguard.ssl.util.ExceptionUtils;
 import com.floragunn.searchguard.user.AuthCredentials;
 
+@Ignore
 public class LdapBackendTestClientCert {
+    
+    static {
+        System.setProperty("sg.display_lic_none", "true");
+    }
 
     @Test
     public void testNoAuth() throws Exception {

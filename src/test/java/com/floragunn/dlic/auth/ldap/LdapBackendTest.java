@@ -40,6 +40,10 @@ import com.floragunn.searchguard.user.AuthCredentials;
 import com.floragunn.searchguard.user.User;
 
 public class LdapBackendTest {
+    
+    static {
+        System.setProperty("sg.display_lic_none", "true");
+    }
 
     protected EmbeddedLDAPServer ldapServer = null;
 
