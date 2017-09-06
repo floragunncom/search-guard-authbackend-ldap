@@ -1,19 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- 
- * Copyright 2016 by floragunn UG (haftungsbeschränkt) - All rights reserved
- * 
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed here is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * 
- * This software is free of charge for non-commercial and academic use. 
- * For commercial use in a production environment you have to obtain a license 
- * from https://floragunn.com
- -->
+<!-- * Copyright 2016 by floragunn UG (haftungsbeschränkt) - All rights reserved 
+  * * * Unless required by applicable law or agreed to in writing, software 
+  * distributed here is distributed on an "AS IS" BASIS, * WITHOUT WARRANTIES 
+  OR CONDITIONS OF ANY KIND, either express or implied. * * This software is 
+  free of charge for non-commercial and academic use. * For commercial use 
+  in a production environment you have to obtain a license * from https://floragunn.com -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <!--http://svn.apache.org/viewvc/directory/apacheds/trunk/ldap-client-test/src/test/java/org/apache/directory/shared/client/api/LdapConnectionTest.java?revision=1243572&view=markup -->
@@ -23,13 +18,25 @@
 
   <groupId>com.floragunn</groupId>
   <artifactId>dlic-search-guard-authbackend-ldap</artifactId>
-  <version>5.0-8-SNAPSHOT</version>
+  <version>6.x-HEAD-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Search Guard</name>
   <description>Provide access control related features for elasticsearch</description>
   <url>https://github.com/floragunncom/search-guard-authbackend-ldap</url>
   <inceptionYear>2016</inceptionYear>
+
+  <repositories>
+    <repository>
+      <id>lucene-repository</id>
+      <name>Lucene Maven</name>
+      <url>https://download.elasticsearch.org/lucenesnapshots/a128fcb</url>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
+    </repository>
+  </repositories>
 
   <distributionManagement>
     <snapshotRepository>
@@ -43,9 +50,9 @@
   </distributionManagement>
 
   <properties>
-    <sg2.version>5.5.x-HEAD-SNAPSHOT</sg2.version>
+    <sg2.version>6.x-HEAD-SNAPSHOT</sg2.version>
+    <elasticsearch.version>6.0.0-beta2</elasticsearch.version>
     <apache.ds.version>2.0.0-M21</apache.ds.version>
-    <elasticsearch.version>5.5.1</elasticsearch.version>
     <dependency.locations.enabled>false</dependency.locations.enabled>
   </properties>
 
@@ -81,12 +88,12 @@
   <dependencies>
     <dependency>
       <groupId>com.floragunn</groupId>
-      <artifactId>search-guard-5</artifactId>
+      <artifactId>search-guard-6</artifactId>
       <version>${sg2.version}</version>
       <scope>provided</scope>
     </dependency>
-    
-   <dependency>
+
+    <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
       <version>2.8.2</version>
@@ -121,12 +128,9 @@
         </exclusion>
       </exclusions>
     </dependency>
-    
-   <!--<dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <version>1.7.25</version>
-    </dependency>  -->
+
+    <!--<dependency> <groupId>org.slf4j</groupId> <artifactId>slf4j-api</artifactId> 
+      <version>1.7.25</version> </dependency> -->
 
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
@@ -134,11 +138,11 @@
       <version>2.8.2</version>
       <exclusions>
         <exclusion>
-         <groupId>org.apache.logging.log4j</groupId>
-         <artifactId>log4j-api</artifactId>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>log4j-api</artifactId>
         </exclusion>
       </exclusions>
-    </dependency> 
+    </dependency>
 
     <!-- Only test scoped dependencies hereafter -->
 
@@ -169,19 +173,10 @@
       </exclusions>
     </dependency>
 
-    <!-- <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
-      <version>1.7.21</version>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>slf4j-api</artifactId>
-          <groupId>org.slf4j</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency> -->
-  </dependencies>  
+    <!-- <dependency> <groupId>org.slf4j</groupId> <artifactId>slf4j-log4j12</artifactId> 
+      <version>1.7.21</version> <scope>test</scope> <exclusions> <exclusion> <artifactId>slf4j-api</artifactId> 
+      <groupId>org.slf4j</groupId> </exclusion> </exclusions> </dependency> -->
+  </dependencies>
 
   <build>
     <testResources>
@@ -250,10 +245,10 @@
           <archive>
             <manifest>
               <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
-              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
             </manifest>
             <manifestEntries>
-              <Built-By>floragunn</Built-By>
+              <Built-By>floragunn GmbH</Built-By>
+              <Build-Time>${maven.build.timestamp}</Build-Time>
             </manifestEntries>
           </archive>
         </configuration>

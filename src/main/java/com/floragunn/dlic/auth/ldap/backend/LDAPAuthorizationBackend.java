@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.KeyStore;
@@ -103,13 +104,15 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     }
 
     protected static final Logger log = LogManager.getLogger(LDAPAuthorizationBackend.class);
-    final Settings settings;
+    private final Settings settings;
+    private final Path configPath;
 
-    public LDAPAuthorizationBackend(final Settings settings) {
+    public LDAPAuthorizationBackend(final Settings settings, final Path configPath) {
         this.settings = settings;
+        this.configPath = configPath;
     }
     
-    public static Connection getConnection(final Settings settings) throws Exception {
+    public static Connection getConnection(final Settings settings, final Path configPath) throws Exception {
         
         final SecurityManager sm = System.getSecurityManager();
 
@@ -121,7 +124,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             return AccessController.doPrivileged(new PrivilegedExceptionAction<Connection>() {
                 @Override
                 public Connection run() throws Exception {
-                    return getConnection0(settings);
+                    return getConnection0(settings, configPath);
                 }
             });
         } catch (PrivilegedActionException e) {
@@ -130,7 +133,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
     }
 
-    private static Connection getConnection0(final Settings settings) throws KeyStoreException, NoSuchAlgorithmException,
+    private static Connection getConnection0(final Settings settings, final Path configPath) throws KeyStoreException, NoSuchAlgorithmException,
     CertificateException, FileNotFoundException, IOException, LdapException {
         final boolean enableSSL = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL, false);
 
@@ -163,7 +166,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     log.trace("Connect to {}", config.getLdapUrl());
                 }
                 
-                final Map<String, Object> props = configureSSL(config, settings);
+                final Map<String, Object> props = configureSSL(config, settings, configPath);
 
                 DefaultConnectionFactory connFactory = new DefaultConnectionFactory(config);
                 connFactory.getProvider().getProviderConfig().setProperties(props);
@@ -247,12 +250,12 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         return new ByteArrayInputStream(content.getBytes(StandardCharsets.US_ASCII));
     }
     
-    private static String resolve(String propName, Settings settings, boolean mustBeValid) {
+    private static String resolve(String propName, Settings settings, Path configPath, boolean mustBeValid) {
         
         final String originalPath = settings.get(propName, null);
         String path = originalPath;
         log.debug("Value for {} is {}", propName, originalPath);
-        final Environment env = new Environment(settings);
+        final Environment env = new Environment(settings, configPath);
         
         if(env != null && originalPath != null && originalPath.length() > 0) {
             path = env.configFile().resolve(originalPath).toAbsolutePath().toString();
@@ -356,7 +359,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
       return store;
     }
 
-    private static Map<String, Object> configureSSL(final ConnectionConfig config, final Settings settings) throws Exception {
+    private static Map<String, Object> configureSSL(final ConnectionConfig config, final Settings settings, final Path configPath) throws Exception {
         
         final Map<String, Object> props = new HashMap<String, Object>();
         final boolean enableSSL = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL, false);
@@ -381,19 +384,19 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 X509Certificate[] trustCertificates = loadCertificatesFromStream(resolveStream(ConfigConstants.LDAPS_PEMTRUSTEDCAS_CONTENT, settings));
                 
                 if(trustCertificates == null) {
-                    trustCertificates = loadCertificatesFromFile(resolve(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, settings, true));
+                    trustCertificates = loadCertificatesFromFile(resolve(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, settings, configPath, true));
                 }
                     //for client authentication
                 X509Certificate authenticationCertificate = loadCertificateFromStream(resolveStream(ConfigConstants.LDAPS_PEMCERT_CONTENT, settings));
                 
                 if(authenticationCertificate == null) {
-                    authenticationCertificate = loadCertificateFromFile(resolve(ConfigConstants.LDAPS_PEMCERT_FILEPATH, settings, enableClientAuth));
+                    authenticationCertificate = loadCertificateFromFile(resolve(ConfigConstants.LDAPS_PEMCERT_FILEPATH, settings, configPath, enableClientAuth));
                 }
                 
                 PrivateKey authenticationKey = loadKeyFromStream(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolveStream(ConfigConstants.LDAPS_PEMKEY_CONTENT, settings));
                 
                 if(authenticationKey == null) {
-                    authenticationKey = loadKeyFromFile(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolve(ConfigConstants.LDAPS_PEMKEY_FILEPATH, settings, enableClientAuth));    
+                    authenticationKey = loadKeyFromFile(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolve(ConfigConstants.LDAPS_PEMKEY_FILEPATH, settings, configPath, enableClientAuth));    
                 }
 
                 cc = CredentialConfigFactory.createX509CredentialConfig(trustCertificates, authenticationCertificate, authenticationKey);
@@ -403,14 +406,14 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 }
                 
             } else {
-                final KeyStore trustStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, settings, true)
+                final KeyStore trustStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, settings, configPath, true)
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, DEFAULT_TRUSTSTORE_PASSWORD)
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_TYPE));
                 
                 final String[] trustStoreAliases = settings.getAsArray(ConfigConstants.LDAPS_JKS_TRUST_ALIAS, null);
                 
                 //for client authentication
-                final KeyStore keyStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, settings, enableClientAuth)
+                final KeyStore keyStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, settings, configPath, enableClientAuth)
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD)
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_TYPE));
                 final String keyStorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);
@@ -506,7 +509,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
             if(entry == null || dn == null) {
             
-                connection = getConnection(settings);
+                connection = getConnection(settings, configPath);
                 
                 if (isValidDn(authenticatedUser)) {
                     // assume dn

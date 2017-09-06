@@ -15,6 +15,7 @@
 package com.floragunn.dlic.auth.ldap.backend;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -56,9 +57,11 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     protected static final Logger log = LogManager.getLogger(LDAPAuthenticationBackend.class);
 
     private final Settings settings;
-
-    public LDAPAuthenticationBackend(final Settings settings) {
+    private final Path configPath;
+    
+    public LDAPAuthenticationBackend(final Settings settings, final Path configPath) {
         this.settings = settings;
+        this.configPath = configPath;
     }
     
 
@@ -71,7 +74,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
 
         try {
 
-            ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
+            ldapConnection = LDAPAuthorizationBackend.getConnection(settings, configPath);
 
             LdapEntry entry = exists(user, ldapConnection, settings);
 
@@ -152,7 +155,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
         }
 
         try {
-            ldapConnection = LDAPAuthorizationBackend.getConnection(settings);
+            ldapConnection = LDAPAuthorizationBackend.getConnection(settings, configPath);
             return exists(userName, ldapConnection, settings) != null; 
         } catch (final Exception e) {
             log.warn("User {} does not exist due to "+e, userName);
