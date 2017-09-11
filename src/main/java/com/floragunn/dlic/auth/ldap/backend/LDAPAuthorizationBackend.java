@@ -14,17 +14,27 @@
 
 package com.floragunn.dlic.auth.ldap.backend;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,6 +51,7 @@ import javax.naming.ldap.Rdn;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.ElasticsearchSecurityException;
 import org.elasticsearch.SpecialPermission;
 import org.elasticsearch.common.Strings;
@@ -55,6 +66,7 @@ import org.ldaptive.LdapAttribute;
 import org.ldaptive.LdapEntry;
 import org.ldaptive.LdapException;
 import org.ldaptive.SearchScope;
+import org.ldaptive.sasl.ExternalConfig;
 import org.ldaptive.ssl.AllowAnyHostnameVerifier;
 import org.ldaptive.ssl.CredentialConfig;
 import org.ldaptive.ssl.CredentialConfigFactory;
@@ -64,6 +76,7 @@ import org.ldaptive.ssl.SslConfig;
 import com.floragunn.dlic.auth.ldap.LdapUser;
 import com.floragunn.dlic.auth.ldap.util.ConfigConstants;
 import com.floragunn.dlic.auth.ldap.util.LdapHelper;
+import com.floragunn.dlic.auth.ldap.util.PemKeyReader;
 import com.floragunn.dlic.auth.ldap.util.Utils;
 import com.floragunn.searchguard.auth.AuthorizationBackend;
 import com.floragunn.searchguard.ssl.util.SSLConfigConstants;
@@ -77,6 +90,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     static final String JKS = "JKS";
     static final String PKCS12 = "PKCS12";
     static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
+    static final String DEFAULT_TRUSTSTORE_PASSWORD = "changeit";
     static final String ONE_PLACEHOLDER = "{1}";
     static final String TWO_PLACEHOLDER = "{2}";
     static final String DEFAULT_ROLEBASE = "";
@@ -85,7 +99,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     static final String DEFAULT_USERROLENAME = "memberOf";
 
     static {
-        Utils.printLicenseInfo();
+        Utils.init();
     }
 
     protected static final Logger log = LogManager.getLogger(LDAPAuthorizationBackend.class);
@@ -149,7 +163,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     log.trace("Connect to {}", config.getLdapUrl());
                 }
                 
-                Map<String, Object> props = configureSSL(config, settings);
+                final Map<String, Object> props = configureSSL(config, settings);
 
                 DefaultConnectionFactory connFactory = new DefaultConnectionFactory(config);
                 connFactory.getProvider().getProviderConfig().setProperties(props);
@@ -166,7 +180,21 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     log.error("No password given for bind_dn {}. Will try to authenticate anonymously to ldap", bindDn);
                 }
                 
-                BindRequest br = new BindRequest();
+                final boolean enableClientAuth = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL_CLIENT_AUTH, ConfigConstants.LDAPS_ENABLE_SSL_CLIENT_AUTH_DEFAULT);
+
+                if(log.isDebugEnabled()) {
+                    if(enableClientAuth && bindDn == null) {
+                        log.debug("Will perform External SASL bind because client cert authentication is enabled");
+                    } else if(bindDn == null) {
+                        log.debug("Will perform anonymous bind because to bind dn is given");
+                    } else if(enableClientAuth && bindDn != null) {
+                        log.debug("Will perform simple bind with bind dn because to bind dn is given and overrides client cert authentication");
+                    } else if(!enableClientAuth && bindDn != null) {
+                        log.debug("Will perform simple bind with bind dn");
+                    }
+                }
+                
+                BindRequest br = enableClientAuth?new BindRequest(new ExternalConfig()):new BindRequest();
                 
                 if (bindDn != null && password != null && password.length() > 0) {
                     br = new BindRequest(bindDn, new Credential(password));
@@ -193,61 +221,222 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
         return connection;
     }
+    
+    private static void checkPath(String keystoreFilePath, String fileNameLogOnly) {
+        
+        if (keystoreFilePath == null || keystoreFilePath.length() == 0) {
+            throw new ElasticsearchException("Empty file path for "+fileNameLogOnly);
+        }
+        
+        if (Files.isDirectory(Paths.get(keystoreFilePath), LinkOption.NOFOLLOW_LINKS)) {
+            throw new ElasticsearchException("Is a directory: " + keystoreFilePath+" Expected a file for "+fileNameLogOnly);
+        }
 
-    private static Map<String, Object> configureSSL(final ConnectionConfig config, final Settings settings) throws KeyStoreException,
-            NoSuchAlgorithmException, CertificateException, FileNotFoundException, IOException {
-        Map<String, Object> props = new HashMap<String, Object>();
+        if(!Files.isReadable(Paths.get(keystoreFilePath))) {
+            throw new ElasticsearchException("Unable to read " + keystoreFilePath + " ("+Paths.get(keystoreFilePath)+"). Please make sure this files exists and is readable regarding to permissions. Property: "+fileNameLogOnly);
+        }
+    }
+    
+    private static InputStream resolveStream(String propName, Settings settings) {
+        final String content = settings.get(propName, null);
+        
+        if(content == null) {
+            return null;
+        }
+
+        return new ByteArrayInputStream(content.getBytes(StandardCharsets.US_ASCII));
+    }
+    
+    private static String resolve(String propName, Settings settings, boolean mustBeValid) {
+        
+        final String originalPath = settings.get(propName, null);
+        String path = originalPath;
+        log.debug("Value for {} is {}", propName, originalPath);
+        final Environment env = new Environment(settings);
+        
+        if(env != null && originalPath != null && originalPath.length() > 0) {
+            path = env.configFile().resolve(originalPath).toAbsolutePath().toString();
+            log.debug("Resolved {} to {} against {}", originalPath, path, env.configFile().toAbsolutePath().toString());
+        }
+        
+        if(mustBeValid) {
+            checkPath(path, propName);
+        }
+        
+        if("".equals(path)) {
+            path = null;
+        }
+        
+        return path;
+    }
+    
+    private static PrivateKey loadKeyFromFile(String password, String keyFile) throws Exception {
+        
+        if(keyFile == null) {
+            return null;
+        }
+        
+        return PemKeyReader.toPrivateKey(new File(keyFile), password);
+    }
+    
+    private static PrivateKey loadKeyFromStream(String password, InputStream in) throws Exception {
+        
+        if(in == null) {
+            return null;
+        }
+        
+        return PemKeyReader.toPrivateKey(in, password);
+    }
+    
+    private static X509Certificate[] loadCertificatesFromFile(String file) throws Exception {
+        if(file == null) {
+            return null;
+        }
+        
+        CertificateFactory fact = CertificateFactory.getInstance("X.509");
+        try(FileInputStream is = new FileInputStream(file)) {
+            Collection<? extends Certificate> certs = fact.generateCertificates(is);
+            X509Certificate[] x509Certs = new X509Certificate[certs.size()];
+            int i=0;
+            for(Certificate cert: certs) {
+                x509Certs[i++] = (X509Certificate) cert;
+            }
+            return x509Certs;
+        }
+        
+    }
+    
+    private static X509Certificate[] loadCertificatesFromStream(InputStream in) throws Exception {
+        if(in == null) {
+            return null;
+        }
+        
+        CertificateFactory fact = CertificateFactory.getInstance("X.509");
+        Collection<? extends Certificate> certs = fact.generateCertificates(in);
+        X509Certificate[] x509Certs = new X509Certificate[certs.size()];
+        int i=0;
+        for(Certificate cert: certs) {
+            x509Certs[i++] = (X509Certificate) cert;
+        }
+        return x509Certs;
+        
+    }
+    
+    private static X509Certificate loadCertificateFromFile(String file) throws Exception {
+        if(file == null) {
+            return null;
+        }
+        
+        CertificateFactory fact = CertificateFactory.getInstance("X.509");
+        try(FileInputStream is = new FileInputStream(file)) {
+            return (X509Certificate) fact.generateCertificate(is);
+        }
+    }
+    
+    private static X509Certificate loadCertificateFromStream(InputStream in) throws Exception {
+        if(in == null) {
+            return null;
+        }
+        
+        CertificateFactory fact = CertificateFactory.getInstance("X.509");
+        return (X509Certificate) fact.generateCertificate(in);
+    }
+    
+    private static KeyStore loadKeyStore(String storePath, String keyStorePassword, String type) throws Exception {
+      if(storePath == null) {
+          return null;
+      }
+
+      if(type == null || !type.toUpperCase().equals(JKS) || !type.toUpperCase().equals(PKCS12)) {
+          type = JKS;
+      }
+      
+      final KeyStore store = KeyStore.getInstance(type.toUpperCase());
+      store.load(new FileInputStream(storePath), keyStorePassword==null?null:keyStorePassword.toCharArray());
+      return store;
+    }
+
+    private static Map<String, Object> configureSSL(final ConnectionConfig config, final Settings settings) throws Exception {
+        
+        final Map<String, Object> props = new HashMap<String, Object>();
         final boolean enableSSL = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL, false);
         final boolean enableStartTLS = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_START_TLS, false);
 
         if (enableSSL || enableStartTLS) {
             
-            final boolean enableClientAuth = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL_CLIENT_AUTH, false);
-            final boolean verifyHostnames = settings.getAsBoolean(ConfigConstants.LDAPS_VERIFY_HOSTNAMES, true);
+            final boolean enableClientAuth = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL_CLIENT_AUTH, ConfigConstants.LDAPS_ENABLE_SSL_CLIENT_AUTH_DEFAULT);
+            final boolean verifyHostnames = settings.getAsBoolean(ConfigConstants.LDAPS_VERIFY_HOSTNAMES, ConfigConstants.LDAPS_VERIFY_HOSTNAMES_DEFAULT);
             
-            final SslConfig sslConfig = new SslConfig();
-            
-            Environment env = new Environment(settings);
-     
-            File trustStore = env.configFile().resolve(settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH)).toFile();
-            String truststorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);
-            
-            File keystore = null;
-            String keystorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);        
-        
-            final String _keystore = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH);
-            
-            if(_keystore != null) {
-                keystore = env.configFile().resolve(settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH)).toFile();
-            }
-            
-            if (trustStore != null) {
-                final KeyStore myTrustStore = KeyStore.getInstance(trustStore.getName().endsWith(JKS.toLowerCase()) ? JKS : PKCS12);
-                myTrustStore.load(new FileInputStream(trustStore),
-                        truststorePassword == null || truststorePassword.isEmpty() ? null : truststorePassword.toCharArray());
-                
-                if (enableClientAuth && keystore != null) {
-                    final KeyStore keyStore = KeyStore.getInstance(keystore.getName().endsWith(JKS.toLowerCase()) ? JKS : PKCS12);
-                    keyStore.load(new FileInputStream(keystore), keystorePassword == null || keystorePassword.isEmpty() ? null
-                            : keystorePassword.toCharArray());
-                    
-                    CredentialConfig cc = CredentialConfigFactory.createKeyStoreCredentialConfig(myTrustStore, keyStore, keystorePassword);
-                    sslConfig.setCredentialConfig(cc);
-                } else {
-                    CredentialConfig cc = CredentialConfigFactory.createKeyStoreCredentialConfig(myTrustStore);
-                    sslConfig.setCredentialConfig(cc);
-                }
-                
-            }
-
             if(enableStartTLS && !verifyHostnames) {
                 props.put("jndi.starttls.allowAnyHostname", "true");
             }
             
+            final boolean pem = settings.get(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, null) != null
+                    || settings.get(ConfigConstants.LDAPS_PEMTRUSTEDCAS_CONTENT, null) != null;
+            
+            final SslConfig sslConfig = new SslConfig();
+            CredentialConfig cc;
+            
+            if(pem) {
+                X509Certificate[] trustCertificates = loadCertificatesFromStream(resolveStream(ConfigConstants.LDAPS_PEMTRUSTEDCAS_CONTENT, settings));
+                
+                if(trustCertificates == null) {
+                    trustCertificates = loadCertificatesFromFile(resolve(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, settings, true));
+                }
+                    //for client authentication
+                X509Certificate authenticationCertificate = loadCertificateFromStream(resolveStream(ConfigConstants.LDAPS_PEMCERT_CONTENT, settings));
+                
+                if(authenticationCertificate == null) {
+                    authenticationCertificate = loadCertificateFromFile(resolve(ConfigConstants.LDAPS_PEMCERT_FILEPATH, settings, enableClientAuth));
+                }
+                
+                PrivateKey authenticationKey = loadKeyFromStream(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolveStream(ConfigConstants.LDAPS_PEMKEY_CONTENT, settings));
+                
+                if(authenticationKey == null) {
+                    authenticationKey = loadKeyFromFile(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolve(ConfigConstants.LDAPS_PEMKEY_FILEPATH, settings, enableClientAuth));    
+                }
+
+                cc = CredentialConfigFactory.createX509CredentialConfig(trustCertificates, authenticationCertificate, authenticationKey);
+                
+                if(log.isDebugEnabled()) {
+                    log.debug("Use PEM to secure communication with LDAP server (client auth is {})", authenticationKey!=null);
+                }
+                
+            } else {
+                final KeyStore trustStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, settings, true)
+                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, DEFAULT_TRUSTSTORE_PASSWORD)
+                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_TYPE));
+                
+                final String[] trustStoreAliases = settings.getAsArray(ConfigConstants.LDAPS_JKS_TRUST_ALIAS, null);
+                
+                //for client authentication
+                final KeyStore keyStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, settings, enableClientAuth)
+                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD)
+                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_TYPE));
+                final String keyStorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);
+                
+                final String keyStoreAlias = settings.get(ConfigConstants.LDAPS_JKS_CERT_ALIAS, null);
+                final String[] keyStoreAliases = keyStoreAlias==null?null:new String[]{keyStoreAlias};
+                
+                if(enableClientAuth && keyStoreAliases == null) {
+                    throw new IllegalArgumentException(ConfigConstants.LDAPS_JKS_CERT_ALIAS+" not given");
+                }
+                
+                if(log.isDebugEnabled()) {
+                    log.debug("Use Trust-/Keystore to secure communication with LDAP server (client auth is {})", keyStore!=null);
+                    log.debug("trustStoreAliases: {}, keyStoreAlias: {}",  Arrays.toString(trustStoreAliases), keyStoreAlias);
+                }
+                
+                cc = CredentialConfigFactory.createKeyStoreCredentialConfig(trustStore, trustStoreAliases, keyStore, keyStorePassword, keyStoreAliases);
+
+            }
+            
+            sslConfig.setCredentialConfig(cc);
+            
             if(!verifyHostnames) {
                 sslConfig.setTrustManagers(new HostnameVerifyingTrustManager(new AllowAnyHostnameVerifier(), "dummy"));
             }
-
+       
             //https://github.com/floragunncom/search-guard/issues/227
             final String[] enabledCipherSuites = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, EMPTY_STRING_ARRAY);   
             final String[] enabledProtocols = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, new String[] { "TLSv1.1", "TLSv1.2" });   
@@ -266,6 +455,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         config.setUseSSL(enableSSL);
         config.setUseStartTLS(enableStartTLS);
         config.setConnectTimeout(5000L); // 5 sec
+        
         return props;
         
     }

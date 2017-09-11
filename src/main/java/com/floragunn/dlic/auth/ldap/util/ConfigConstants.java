@@ -37,10 +37,26 @@ public final class ConfigConstants {
     public static final String LDAP_FAKE_LOGIN_DN = "fakelogin_dn";
     public static final String LDAP_FAKE_LOGIN_Password = "fakelogin_password";
     
+    //ssl
     public static final String LDAPS_VERIFY_HOSTNAMES = "verify_hostnames";
+    public static final boolean LDAPS_VERIFY_HOSTNAMES_DEFAULT = true;
     public static final String LDAPS_ENABLE_SSL = "enable_ssl";
     public static final String LDAPS_ENABLE_START_TLS = "enable_start_tls";
     public static final String LDAPS_ENABLE_SSL_CLIENT_AUTH = "enable_ssl_client_auth";
+    public static final boolean LDAPS_ENABLE_SSL_CLIENT_AUTH_DEFAULT = false;
+    
+    public static final String LDAPS_JKS_CERT_ALIAS = "cert_alias";
+    public static final String LDAPS_JKS_TRUST_ALIAS = "ca_alias";
+    
+    public static final String LDAPS_PEMKEY_FILEPATH = "pemkey_filepath";
+    public static final String LDAPS_PEMKEY_CONTENT = "pemkey_content";
+    public static final String LDAPS_PEMKEY_PASSWORD = "pemkey_password";
+    public static final String LDAPS_PEMCERT_FILEPATH = "pemcert_filepath";
+    public static final String LDAPS_PEMCERT_CONTENT = "pemcert_content";
+    public static final String LDAPS_PEMTRUSTEDCAS_FILEPATH = "pemtrustedcas_filepath";
+    public static final String LDAPS_PEMTRUSTEDCAS_CONTENT = "pemtrustedcas_content";
+
+    
     
     public static final String LDAPS_ENABLED_SSL_CIPHERS = "enabled_ssl_ciphers";
     public static final String LDAPS_ENABLED_SSL_PROTOCOLS = "enabled_ssl_protocols";

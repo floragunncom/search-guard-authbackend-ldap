@@ -50,7 +50,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     static final String DEFAULT_USERSEARCH_PATTERN = "(sAMAccountName={0})";
 
     static {
-        Utils.printLicenseInfo();
+        Utils.init();
     }
 
     protected static final Logger log = LogManager.getLogger(LDAPAuthenticationBackend.class);
