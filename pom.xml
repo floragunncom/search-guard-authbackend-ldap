@@ -43,9 +43,9 @@
   </distributionManagement>
 
   <properties>
-    <sg2.version>5.5.x-HEAD-SNAPSHOT</sg2.version>
+    <sg2.version>5.5.2-16</sg2.version>
     <apache.ds.version>2.0.0-M21</apache.ds.version>
-    <elasticsearch.version>5.5.1</elasticsearch.version>
+    <elasticsearch.version>5.5.2</elasticsearch.version>
     <dependency.locations.enabled>false</dependency.locations.enabled>
   </properties>
 
