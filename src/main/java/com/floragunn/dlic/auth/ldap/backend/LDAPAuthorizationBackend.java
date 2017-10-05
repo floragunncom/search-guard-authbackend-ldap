@@ -455,7 +455,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     connection,
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
                     settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
-                    .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, dn).replace(ONE_PLACEHOLDER, originalUserName)
+                    .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, Utils.escapeStringRfc2254(dn)).replace(ONE_PLACEHOLDER, originalUserName)
                     .replace(TWO_PLACEHOLDER, userRoleAttributeValue == null ? TWO_PLACEHOLDER : userRoleAttributeValue), SearchScope.SUBTREE);
             
             if(rolesResult != null && !rolesResult.isEmpty()) {
@@ -581,13 +581,15 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         if (log.isTraceEnabled()) {
             log.trace("result nested attr count for depth {} : {}", depth, result.size());
         }
+        
+        final String escapedDn = Utils.escapeStringRfc2254(roleDn.toString());
 
         final List<LdapEntry> rolesResult = !rolesearchEnabled?null:LdapHelper
                 .search(ldapConnection,
                         settings.get(ConfigConstants.LDAP_AUTHZ_ROLEBASE, DEFAULT_ROLEBASE),
                         settings.get(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, DEFAULT_ROLESEARCH)
-                                .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, roleDn.toString())
-                                .replace(ONE_PLACEHOLDER, roleDn.toString()), SearchScope.SUBTREE);
+                                .replace(LDAPAuthenticationBackend.ZERO_PLACEHOLDER, escapedDn)
+                                .replace(ONE_PLACEHOLDER, escapedDn), SearchScope.SUBTREE);
 
         if (log.isTraceEnabled()) {
             log.trace("result nested search count for depth {}: {}", depth, rolesResult==null?0:rolesResult.size());
