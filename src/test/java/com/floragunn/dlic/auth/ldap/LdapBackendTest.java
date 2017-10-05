@@ -422,6 +422,8 @@ public class LdapBackendTest {
                 .put(ConfigConstants.LDAP_AUTHZ_ROLEBASE, "ou=groups,o=TEST")
                 .put(ConfigConstants.LDAP_AUTHZ_ROLENAME, "cn")
                 .put(ConfigConstants.LDAP_AUTHZ_ROLESEARCH, "(uniqueMember={0})")
+                .put(ConfigConstants.LDAP_AUTHZ_USERROLENAME, "description") // no memberOf OID
+                .put(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, true)
                 .build();
 
         final LdapUser user = (LdapUser) new LDAPAuthenticationBackend(settings).authenticate(new AuthCredentials("ssign", "ssignsecret"
@@ -430,6 +432,8 @@ public class LdapBackendTest {
         Assert.assertEquals("cn=Special\\, Sign,ou=people,o=TEST", user.getName());
         new LDAPAuthorizationBackend(settings).fillRoles(user, null);
         Assert.assertEquals("cn=Special\\, Sign,ou=people,o=TEST", user.getName());
+        Assert.assertEquals(4, user.getRoles().size());
+        Assert.assertTrue(user.getRoles().toString().contains("ceo"));
     }
     
     @Test

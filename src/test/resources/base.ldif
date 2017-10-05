@@ -67,6 +67,7 @@ sn: ssign
 uid: ssign
 userpassword: ssignsecret
 mail: ssign@example.com
+description: cn=dummyempty,ou=groups,o=TEST
 
 dn: cn=ceo,ou=groups,o=TEST
 objectClass: groupOfUniqueNames
@@ -74,6 +75,17 @@ cn: ceo
 uniqueMember: cn=Michael Jackson,ou=people,o=TEST
 uniqueMember: cn=Captain Spock,ou=people,o=TEST
 uniqueMember: cn=hnelson,ou=people,o=TEST
+uniqueMember: cn=Special\, Sign,ou=people,o=TEST
+
+dn: cn=spec\,group,ou=groups,o=TEST
+objectClass: groupOfUniqueNames
+cn: special2
+uniqueMember: cn=Special\, Sign,ou=people,o=TEST
+
+dn: cn=spec\, groupnest,ou=groups,o=TEST
+objectClass: groupOfUniqueNames
+cn: special2
+uniqueMember: cn=spec\,group,ou=groups,o=TEST
 
 dn: cn=role2,ou=groups,o=TEST
 objectClass: groupOfUniqueNames
