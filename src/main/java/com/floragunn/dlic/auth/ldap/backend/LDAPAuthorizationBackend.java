@@ -14,17 +14,9 @@
 
 package com.floragunn.dlic.auth.ldap.backend;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.AccessController;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -32,9 +24,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Collection;
@@ -52,12 +42,10 @@ import javax.naming.ldap.Rdn;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.ElasticsearchSecurityException;
 import org.elasticsearch.SpecialPermission;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.env.Environment;
 import org.ldaptive.BindRequest;
 import org.ldaptive.Connection;
 import org.ldaptive.ConnectionConfig;
@@ -77,10 +65,10 @@ import org.ldaptive.ssl.SslConfig;
 import com.floragunn.dlic.auth.ldap.LdapUser;
 import com.floragunn.dlic.auth.ldap.util.ConfigConstants;
 import com.floragunn.dlic.auth.ldap.util.LdapHelper;
-import com.floragunn.dlic.auth.ldap.util.PemKeyReader;
 import com.floragunn.dlic.auth.ldap.util.Utils;
 import com.floragunn.searchguard.auth.AuthorizationBackend;
 import com.floragunn.searchguard.ssl.util.SSLConfigConstants;
+import com.floragunn.searchguard.support.PemKeyReader;
 import com.floragunn.searchguard.support.WildcardMatcher;
 import com.floragunn.searchguard.user.AuthCredentials;
 import com.floragunn.searchguard.user.User;
@@ -88,10 +76,6 @@ import com.floragunn.searchguard.user.User;
 public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
     private static final String[] EMPTY_STRING_ARRAY = new String[0];
-    static final String JKS = "JKS";
-    static final String PKCS12 = "PKCS12";
-    static final String DEFAULT_KEYSTORE_PASSWORD = "changeit";
-    static final String DEFAULT_TRUSTSTORE_PASSWORD = "changeit";
     static final String ONE_PLACEHOLDER = "{1}";
     static final String TWO_PLACEHOLDER = "{2}";
     static final String DEFAULT_ROLEBASE = "";
@@ -225,139 +209,8 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         return connection;
     }
     
-    private static void checkPath(String keystoreFilePath, String fileNameLogOnly) {
-        
-        if (keystoreFilePath == null || keystoreFilePath.length() == 0) {
-            throw new ElasticsearchException("Empty file path for "+fileNameLogOnly);
-        }
-        
-        if (Files.isDirectory(Paths.get(keystoreFilePath), LinkOption.NOFOLLOW_LINKS)) {
-            throw new ElasticsearchException("Is a directory: " + keystoreFilePath+" Expected a file for "+fileNameLogOnly);
-        }
 
-        if(!Files.isReadable(Paths.get(keystoreFilePath))) {
-            throw new ElasticsearchException("Unable to read " + keystoreFilePath + " ("+Paths.get(keystoreFilePath)+"). Please make sure this files exists and is readable regarding to permissions. Property: "+fileNameLogOnly);
-        }
-    }
-    
-    private static InputStream resolveStream(String propName, Settings settings) {
-        final String content = settings.get(propName, null);
-        
-        if(content == null) {
-            return null;
-        }
 
-        return new ByteArrayInputStream(content.getBytes(StandardCharsets.US_ASCII));
-    }
-    
-    private static String resolve(String propName, Settings settings, Path configPath, boolean mustBeValid) {
-        
-        final String originalPath = settings.get(propName, null);
-        String path = originalPath;
-        log.debug("Value for {} is {}", propName, originalPath);
-        final Environment env = new Environment(settings, configPath);
-        
-        if(env != null && originalPath != null && originalPath.length() > 0) {
-            path = env.configFile().resolve(originalPath).toAbsolutePath().toString();
-            log.debug("Resolved {} to {} against {}", originalPath, path, env.configFile().toAbsolutePath().toString());
-        }
-        
-        if(mustBeValid) {
-            checkPath(path, propName);
-        }
-        
-        if("".equals(path)) {
-            path = null;
-        }
-        
-        return path;
-    }
-    
-    private static PrivateKey loadKeyFromFile(String password, String keyFile) throws Exception {
-        
-        if(keyFile == null) {
-            return null;
-        }
-        
-        return PemKeyReader.toPrivateKey(new File(keyFile), password);
-    }
-    
-    private static PrivateKey loadKeyFromStream(String password, InputStream in) throws Exception {
-        
-        if(in == null) {
-            return null;
-        }
-        
-        return PemKeyReader.toPrivateKey(in, password);
-    }
-    
-    private static X509Certificate[] loadCertificatesFromFile(String file) throws Exception {
-        if(file == null) {
-            return null;
-        }
-        
-        CertificateFactory fact = CertificateFactory.getInstance("X.509");
-        try(FileInputStream is = new FileInputStream(file)) {
-            Collection<? extends Certificate> certs = fact.generateCertificates(is);
-            X509Certificate[] x509Certs = new X509Certificate[certs.size()];
-            int i=0;
-            for(Certificate cert: certs) {
-                x509Certs[i++] = (X509Certificate) cert;
-            }
-            return x509Certs;
-        }
-        
-    }
-    
-    private static X509Certificate[] loadCertificatesFromStream(InputStream in) throws Exception {
-        if(in == null) {
-            return null;
-        }
-        
-        CertificateFactory fact = CertificateFactory.getInstance("X.509");
-        Collection<? extends Certificate> certs = fact.generateCertificates(in);
-        X509Certificate[] x509Certs = new X509Certificate[certs.size()];
-        int i=0;
-        for(Certificate cert: certs) {
-            x509Certs[i++] = (X509Certificate) cert;
-        }
-        return x509Certs;
-        
-    }
-    
-    private static X509Certificate loadCertificateFromFile(String file) throws Exception {
-        if(file == null) {
-            return null;
-        }
-        
-        CertificateFactory fact = CertificateFactory.getInstance("X.509");
-        try(FileInputStream is = new FileInputStream(file)) {
-            return (X509Certificate) fact.generateCertificate(is);
-        }
-    }
-    
-    private static X509Certificate loadCertificateFromStream(InputStream in) throws Exception {
-        if(in == null) {
-            return null;
-        }
-        
-        CertificateFactory fact = CertificateFactory.getInstance("X.509");
-        return (X509Certificate) fact.generateCertificate(in);
-    }
-    
-    private static KeyStore loadKeyStore(String storePath, String keyStorePassword, String type) throws Exception {
-      if(storePath == null) {
-          return null;
-      }
-
-      if(type == null || !type.toUpperCase().equals(JKS) || !type.toUpperCase().equals(PKCS12)) {
-          type = JKS;
-      }
-      
-      final KeyStore store = KeyStore.getInstance(type.toUpperCase());
-      store.load(new FileInputStream(storePath), keyStorePassword==null?null:keyStorePassword.toCharArray());
-      return store;
-    }
 
     private static Map<String, Object> configureSSL(final ConnectionConfig config, final Settings settings, final Path configPath) throws Exception {
         
@@ -381,22 +234,22 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             CredentialConfig cc;
             
             if(pem) {
-                X509Certificate[] trustCertificates = loadCertificatesFromStream(resolveStream(ConfigConstants.LDAPS_PEMTRUSTEDCAS_CONTENT, settings));
+                X509Certificate[] trustCertificates = PemKeyReader.loadCertificatesFromStream(PemKeyReader.resolveStream(ConfigConstants.LDAPS_PEMTRUSTEDCAS_CONTENT, settings));
                 
                 if(trustCertificates == null) {
-                    trustCertificates = loadCertificatesFromFile(resolve(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, settings, configPath, true));
+                    trustCertificates = PemKeyReader.loadCertificatesFromFile(PemKeyReader.resolve(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, settings, configPath, true));
                 }
                     //for client authentication
-                X509Certificate authenticationCertificate = loadCertificateFromStream(resolveStream(ConfigConstants.LDAPS_PEMCERT_CONTENT, settings));
+                X509Certificate authenticationCertificate =  PemKeyReader.loadCertificateFromStream(PemKeyReader.resolveStream(ConfigConstants.LDAPS_PEMCERT_CONTENT, settings));
                 
                 if(authenticationCertificate == null) {
-                    authenticationCertificate = loadCertificateFromFile(resolve(ConfigConstants.LDAPS_PEMCERT_FILEPATH, settings, configPath, enableClientAuth));
+                    authenticationCertificate = PemKeyReader.loadCertificateFromFile(PemKeyReader.resolve(ConfigConstants.LDAPS_PEMCERT_FILEPATH, settings, configPath, enableClientAuth));
                 }
                 
-                PrivateKey authenticationKey = loadKeyFromStream(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolveStream(ConfigConstants.LDAPS_PEMKEY_CONTENT, settings));
+                PrivateKey authenticationKey = PemKeyReader.loadKeyFromStream(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), PemKeyReader.resolveStream(ConfigConstants.LDAPS_PEMKEY_CONTENT, settings));
                 
                 if(authenticationKey == null) {
-                    authenticationKey = loadKeyFromFile(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), resolve(ConfigConstants.LDAPS_PEMKEY_FILEPATH, settings, configPath, enableClientAuth));    
+                    authenticationKey = PemKeyReader.loadKeyFromFile(settings.get(ConfigConstants.LDAPS_PEMKEY_PASSWORD), PemKeyReader.resolve(ConfigConstants.LDAPS_PEMKEY_FILEPATH, settings, configPath, enableClientAuth));    
                 }
 
                 cc = CredentialConfigFactory.createX509CredentialConfig(trustCertificates, authenticationCertificate, authenticationKey);
@@ -406,17 +259,17 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 }
                 
             } else {
-                final KeyStore trustStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, settings, configPath, true)
-                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, DEFAULT_TRUSTSTORE_PASSWORD)
+                final KeyStore trustStore = PemKeyReader.loadKeyStore(PemKeyReader.resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, settings, configPath, true)
+                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, SSLConfigConstants.DEFAULT_STORE_PASSWORD)
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_TYPE));
                 
                 final String[] trustStoreAliases = settings.getAsArray(ConfigConstants.LDAPS_JKS_TRUST_ALIAS, null);
                 
                 //for client authentication
-                final KeyStore keyStore = loadKeyStore(resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, settings, configPath, enableClientAuth)
-                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD)
+                final KeyStore keyStore = PemKeyReader.loadKeyStore(PemKeyReader.resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, settings, configPath, enableClientAuth)
+                        , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, SSLConfigConstants.DEFAULT_STORE_PASSWORD)
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_TYPE));
-                final String keyStorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, DEFAULT_KEYSTORE_PASSWORD);
+                final String keyStorePassword = settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, SSLConfigConstants.DEFAULT_STORE_PASSWORD);
                 
                 final String keyStoreAlias = settings.get(ConfigConstants.LDAPS_JKS_CERT_ALIAS, null);
                 final String[] keyStoreAliases = keyStoreAlias==null?null:new String[]{keyStoreAlias};
