@@ -7,7 +7,9 @@ This module for [Search Guard](https://github.com/floragunncom/search-guard) ena
 
 ## Downloads
 
-* [Elasticsearch 5.x / LDAP module 5.0-7](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/5.0-7/dlic-search-guard-authbackend-ldap-5.0-7-jar-with-dependencies.jar)
+* [Elasticsearch 5.6 / LDAP module 5.6-10](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/5.6-10/dlic-search-guard-authbackend-ldap-5.6-10-jar-with-dependencies.jar)
+
+* [Elasticsearch 5.1/5.2/5.3/5.4/5.5 / LDAP module 5.0-8](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/5.0-8/dlic-search-guard-authbackend-ldap-5.0-8-jar-with-dependencies.jar)
 
 * [Elasticsearch 2.4.x / LDAP module 2.4-7](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/2.4-7/dlic-search-guard-authbackend-ldap-2.4-7-jar-with-dependencies.jar)
 
