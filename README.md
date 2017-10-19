@@ -7,18 +7,9 @@ This module for [Search Guard](https://github.com/floragunncom/search-guard) ena
 
 ## Downloads
 
-* [Elasticsearch 5.6 / LDAP module 5.6-10](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/5.6-10/dlic-search-guard-authbackend-ldap-5.6-10-jar-with-dependencies.jar)
+**Choose the module version matching your Elasticsearch version, and download the jar with dependencies here:**
 
-* [Elasticsearch 5.1/5.2/5.3/5.4/5.5 / LDAP module 5.0-8](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/5.0-8/dlic-search-guard-authbackend-ldap-5.0-8-jar-with-dependencies.jar)
-
-* [Elasticsearch 2.4.x / LDAP module 2.4-7](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/2.4-7/dlic-search-guard-authbackend-ldap-2.4-7-jar-with-dependencies.jar)
-
-* [Elasticsearch 2.3.x / LDAP module 2.3-7](http://search.maven.org/remotecontent?filepath=com/floragunn/dlic-search-guard-authbackend-ldap/2.3-7/dlic-search-guard-authbackend-ldap-2.3-7-jar-with-dependencies.jar)
-
-All versions:
-[Maven central](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.floragunn%22%20AND%20a%3A%22dlic-search-guard-authbackend-ldap%22)
-
-**Choose the module version matching your Elasticsearch version, and download the jar with dependencies.**
+https://github.com/floragunncom/search-guard-authbackend-ldap/wiki
 
 ## Installation
 
@@ -42,7 +33,7 @@ Please refer to the official Search Guard documentation for installation and con
 This software is free of charge for non-commercial and academic use. For commercial use in a production environment you have to obtain a [license](https://floragunn.com/searchguard/searchguard-license-support/). 
 
 ## License
-Copyright 2016 by floragunn GmbH - All rights reserved 
+Copyright 2016-2017 by floragunn GmbH - All rights reserved 
 
 Unless required by applicable law or agreed to in writing, software
 distributed here is distributed on an "AS IS" BASIS,
