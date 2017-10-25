@@ -19,12 +19,11 @@
         <version>6.1-beta4</version>
     </parent>
 
-    <groupId>com.floragunn</groupId>
     <artifactId>dlic-search-guard-authbackend-ldap</artifactId>
     <version>6.x-HEAD-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>Search Guard</name>
+    <name>Search Guard LDAP</name>
     <description>Provide access control related features for elasticsearch</description>
     <url>https://github.com/floragunncom/search-guard-authbackend-ldap</url>
     <inceptionYear>2016</inceptionYear>
@@ -93,8 +92,11 @@
             </exclusions>
         </dependency>
 
-        <!--<dependency> <groupId>org.slf4j</groupId> <artifactId>slf4j-api</artifactId>
-          <version>1.7.25</version> </dependency> -->
+        <!--<dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+          <version>1.7.25</version>
+          </dependency> -->
 
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -154,7 +156,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
             </plugin>
-            <plugin>
+            <!-- <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <configuration>
                     <outputDirectory>${project.build.directory}</outputDirectory>
@@ -170,7 +172,7 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin>  -->
         </plugins>
     </build>
 </project>
