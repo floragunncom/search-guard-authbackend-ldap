@@ -35,7 +35,7 @@ public final class ConfigConstants {
     public static final String LDAP_PASSWORD = "password";
     public static final String LDAP_FAKE_LOGIN_ENABLED = "fakelogin_enabled";
     public static final String LDAP_FAKE_LOGIN_DN = "fakelogin_dn";
-    public static final String LDAP_FAKE_LOGIN_Password = "fakelogin_password";
+    public static final String LDAP_FAKE_LOGIN_PASSWORD = "fakelogin_password";
     
     //ssl
     public static final String LDAPS_VERIFY_HOSTNAMES = "verify_hostnames";

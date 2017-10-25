@@ -36,7 +36,7 @@ public final class Utils {
     }
     
     public static void init() {
-        
+        //empty init() to allow prior initialization and print out the license
     }
     
     public static void unbindAndCloseSilently(final Connection connection) {

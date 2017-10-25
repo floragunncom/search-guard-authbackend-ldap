@@ -83,7 +83,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
             if(entry == null && settings.getAsBoolean(ConfigConstants.LDAP_FAKE_LOGIN_ENABLED, false)) {                
                 String fakeLognDn = settings.get(ConfigConstants.LDAP_FAKE_LOGIN_DN, "CN=faketomakebindfail,DC="+UUID.randomUUID().toString());
                 entry = new LdapEntry(fakeLognDn);
-                password = settings.get(ConfigConstants.LDAP_FAKE_LOGIN_Password, "fakeLoginPwd123").getBytes(StandardCharsets.UTF_8);
+                password = settings.get(ConfigConstants.LDAP_FAKE_LOGIN_PASSWORD, "fakeLoginPwd123").getBytes(StandardCharsets.UTF_8);
             } else if(entry == null) {
                 throw new ElasticsearchSecurityException("No user " + user + " found");
             }
