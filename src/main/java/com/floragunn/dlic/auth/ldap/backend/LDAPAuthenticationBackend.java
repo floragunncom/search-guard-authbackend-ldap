@@ -66,11 +66,11 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
     
 
     @Override
-    public User authenticate(final AuthCredentials authCreds) throws ElasticsearchSecurityException {
+    public User authenticate(final AuthCredentials credentials) throws ElasticsearchSecurityException {
 
         Connection ldapConnection = null;
-        final String user = Utils.escapeStringRfc2254(authCreds.getUsername());
-        byte[] password = authCreds.getPassword();
+        final String user = Utils.escapeStringRfc2254(credentials.getUsername());
+        byte[] password = credentials.getPassword();
 
         try {
 
@@ -125,7 +125,7 @@ public class LDAPAuthenticationBackend implements AuthenticationBackend {
                 log.debug("Authenticated username {}", username);
             }
 
-            return new LdapUser(username, user, entry);
+            return new LdapUser(username, user, entry, credentials);
 
         } catch (final Exception e) {
             if(log.isDebugEnabled()) {

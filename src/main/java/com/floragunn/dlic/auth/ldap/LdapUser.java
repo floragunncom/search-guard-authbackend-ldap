@@ -14,39 +14,31 @@
 
 package com.floragunn.dlic.auth.ldap;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 
+import org.ldaptive.LdapAttribute;
 import org.ldaptive.LdapEntry;
 
+import com.floragunn.searchguard.user.AuthCredentials;
 import com.floragunn.searchguard.user.User;
 
 public class LdapUser extends User {
 
-    /**
-     * 
-     */
     private static final long serialVersionUID = 1L;
     private final LdapEntry userEntry;
-    private final Set<LdapEntry> roleEntries = new HashSet<>();
     private final String originalUsername;
 
-    public LdapUser(final String name, String originalUsername, final LdapEntry userEntry) {
-        super(name);
+    public LdapUser(final String name, String originalUsername, final LdapEntry userEntry, final AuthCredentials credentials) {
+        super(name, null, credentials);
         this.originalUsername = originalUsername;
         this.userEntry = userEntry;
-    }
-
-    @Deprecated
-    public void addRoleEntry(final LdapEntry entry) {
-        roleEntries.add(entry);
-    }
-
-    @Deprecated
-    public void addRoleEntries(final Collection<LdapEntry> entries) {
-        roleEntries.addAll(entries);
+        Map<String, String> attributes = getCustomAttributesMap();
+        attributes.put("ldap.original.username", originalUsername);
+        attributes.put("ldap.dn", userEntry.getDn());
+        
+        for(LdapAttribute attr: userEntry.getAttributes()) {
+            attributes.put("attr.ldap."+attr.getName(), attr.getStringValue());
+        }
     }
 
     public LdapEntry getUserEntry() {
@@ -59,17 +51,5 @@ public class LdapUser extends User {
 
     public String getOriginalUsername() {
         return originalUsername;
-    }
-
-    @Deprecated
-    public Set<LdapEntry> getRoleEntries() {
-        return Collections.unmodifiableSet(roleEntries);
-    }
-
-    @Override
-    @Deprecated
-    public void copyRolesFrom(final User user) {
-        this.addRoleEntries(((LdapUser) user).getRoleEntries());
-        super.copyRolesFrom(user);
     }
 }
