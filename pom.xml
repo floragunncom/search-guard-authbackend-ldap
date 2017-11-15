@@ -30,7 +30,7 @@
 
     <properties>
         <sg2.version>6.x-HEAD-SNAPSHOT</sg2.version>
-        <elasticsearch.version>6.0.0-rc2</elasticsearch.version>
+        <elasticsearch.version>6.0.0</elasticsearch.version>
         <apache.ds.version>2.0.0-M21</apache.ds.version>
     </properties>
 
