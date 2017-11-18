@@ -26,6 +26,7 @@ import org.ldaptive.DerefAliases;
 import org.ldaptive.LdapEntry;
 import org.ldaptive.LdapException;
 import org.ldaptive.Response;
+import org.ldaptive.ReturnAttributes;
 import org.ldaptive.SearchOperation;
 import org.ldaptive.SearchRequest;
 import org.ldaptive.SearchResult;
@@ -34,8 +35,7 @@ import org.ldaptive.referral.SearchReferralHandler;
 
 public class LdapHelper {
 
-    public static List<LdapEntry> search(final Connection conn, final String baseDn, final String filter, final SearchScope searchScope,
-            final String... attributes) throws LdapException {
+    public static List<LdapEntry> search(final Connection conn, final String baseDn, final String filter, final SearchScope searchScope) throws LdapException {
 
         final SecurityManager sm = System.getSecurityManager();
 
@@ -52,7 +52,7 @@ public class LdapHelper {
                     request.setReferralHandler(new SearchReferralHandler());
                     request.setSearchScope(searchScope);
                     request.setDerefAliases(DerefAliases.ALWAYS);
-                    request.setReturnAttributes(attributes);
+                    request.setReturnAttributes(ReturnAttributes.ALL.value());
                     final SearchOperation search = new SearchOperation(conn);
                     // referrals will be followed to build the response
                     final Response<SearchResult> r = search.execute(request);
