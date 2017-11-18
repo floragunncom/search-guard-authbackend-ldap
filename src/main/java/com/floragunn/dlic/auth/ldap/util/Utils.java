@@ -28,7 +28,7 @@ public final class Utils {
     private static final String RFC2254_ESCAPE_CHARS = "\\*()\000";
     
     static {
-        printLicenseInfo();
+        //printLicenseInfo();
     }
     
     private Utils() {
