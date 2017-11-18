@@ -7,8 +7,7 @@
   free of charge for non-commercial and academic use. * For commercial use 
   in a production environment you have to obtain a license * from https://floragunn.com -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <!--http://svn.apache.org/viewvc/directory/apacheds/trunk/ldap-client-test/src/test/java/org/apache/directory/shared/client/api/LdapConnectionTest.java?revision=1243572&view=markup -->
@@ -20,7 +19,7 @@
     </parent>
 
     <artifactId>dlic-search-guard-authbackend-ldap</artifactId>
-    <version>6.0-11.beta1-SNAPSHOT</version>
+    <version>6.0-11.beta1</version>
     <packaging>jar</packaging>
 
     <name>Search Guard LDAP</name>
@@ -38,7 +37,7 @@
         <url>https://github.com/floragunncom/search-guard-authbackend-ldap</url>
         <connection>scm:git:git@github.com:floragunncom/search-guard-authbackend-ldap.git</connection>
         <developerConnection>scm:git:git@github.com:floragunncom/search-guard-authbackend-ldap.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>ves-6.0-11.beta1</tag>
     </scm>
 
     <issueManagement>
@@ -46,7 +45,7 @@
         <url>https://github.com/floragunncom/search-guard-authbackend-ldap/issues</url>
     </issueManagement>
 
-    <contributors/>
+    <contributors />
 
     <dependencies>
         <dependency>
