@@ -44,6 +44,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -788,8 +789,11 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         if("dn".equalsIgnoreCase(role)) {
             return ldapName.toString();
         }
-        
-        List<Rdn> rdns = ldapName.getRdns();
+
+        List<Rdn> rdns = new ArrayList<>(ldapName.getRdns().size());
+        rdns.addAll(ldapName.getRdns());
+
+        Collections.reverse(rdns);
         
         for(Rdn rdn: rdns) {
             if(role.equalsIgnoreCase(rdn.getType())) {
