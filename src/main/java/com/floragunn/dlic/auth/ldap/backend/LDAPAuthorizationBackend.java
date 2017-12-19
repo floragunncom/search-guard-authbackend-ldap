@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 by floragunn UG (haftungsbeschränkt) - All rights reserved
+ * Copyright 2016-2017 by floragunn GmbH - All rights reserved
  * 
  *
  * Unless required by applicable law or agreed to in writing, software
@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 
 import javax.naming.InvalidNameException;
 import javax.naming.ldap.LdapName;
@@ -644,8 +645,11 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         if("dn".equalsIgnoreCase(role)) {
             return ldapName.toString();
         }
-        
-        List<Rdn> rdns = ldapName.getRdns();
+
+        List<Rdn> rdns = new ArrayList<>(ldapName.getRdns().size());
+        rdns.addAll(ldapName.getRdns());
+
+        Collections.reverse(rdns);
         
         for(Rdn rdn: rdns) {
             if(role.equalsIgnoreCase(rdn.getType())) {
