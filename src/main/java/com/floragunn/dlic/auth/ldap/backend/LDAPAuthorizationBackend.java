@@ -76,7 +76,7 @@ import com.floragunn.searchguard.user.User;
 
 public class LDAPAuthorizationBackend implements AuthorizationBackend {
 
-    private static final String[] EMPTY_STRING_ARRAY = new String[0];
+    private static final List<String> DEFAULT_TLS_PROTOCOLS = Arrays.asList(new String[] { "TLSv1.2", "TLSv1.1"});
     static final String ONE_PLACEHOLDER = "{1}";
     static final String TWO_PLACEHOLDER = "{2}";
     static final String DEFAULT_ROLEBASE = "";
@@ -122,19 +122,19 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     CertificateException, FileNotFoundException, IOException, LdapException {
         final boolean enableSSL = settings.getAsBoolean(ConfigConstants.LDAPS_ENABLE_SSL, false);
 
-        final String[] ldapHosts = settings.getAsArray(ConfigConstants.LDAP_HOSTS, new String[] { "localhost" });
+        final List<String> ldapHosts = settings.getAsList(ConfigConstants.LDAP_HOSTS, Collections.singletonList("localhost"));
 
         Connection connection = null;
 
-        for (int i = 0; i < ldapHosts.length; i++) {
+        for (String ldapHost: ldapHosts) {
             
             if(log.isTraceEnabled()) {
-                log.trace("Connect to {}", ldapHosts[i]);
+                log.trace("Connect to {}", ldapHost);
             }
 
             try {
 
-                final String[] split = ldapHosts[i].split(":");
+                final String[] split = ldapHost.split(":");
 
                 int port = 389;
 
@@ -194,7 +194,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                     break;
                 }
             } catch (final Exception e) {
-                log.warn("Unable to connect to ldapserver {} due to {}. Try next.", ldapHosts[i], e.toString());
+                log.warn("Unable to connect to ldapserver {} due to {}. Try next.", ldapHost, e.toString());
                 if(log.isDebugEnabled()) {
                     log.debug("Unable to connect to ldapserver due to ",e);
                 }
@@ -204,7 +204,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
         }
 
         if (connection == null || !connection.isOpen()) {
-            throw new LdapException("Unable to connect to any of those ldap servers " + Arrays.toString(ldapHosts));
+            throw new LdapException("Unable to connect to any of those ldap servers " + ldapHosts);
         }
 
         return connection;
@@ -264,7 +264,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, SSLConfigConstants.DEFAULT_STORE_PASSWORD)
                         , settings.get(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_TYPE));
                 
-                final String[] trustStoreAliases = settings.getAsArray(ConfigConstants.LDAPS_JKS_TRUST_ALIAS, null);
+                final List<String> trustStoreAliases = settings.getAsList(ConfigConstants.LDAPS_JKS_TRUST_ALIAS, null);
                 
                 //for client authentication
                 final KeyStore keyStore = PemKeyReader.loadKeyStore(PemKeyReader.resolve(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH, settings, configPath, enableClientAuth)
@@ -281,10 +281,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 
                 if(log.isDebugEnabled()) {
                     log.debug("Use Trust-/Keystore to secure communication with LDAP server (client auth is {})", keyStore!=null);
-                    log.debug("trustStoreAliases: {}, keyStoreAlias: {}",  Arrays.toString(trustStoreAliases), keyStoreAlias);
+                    log.debug("trustStoreAliases: {}, keyStoreAlias: {}",  trustStoreAliases, keyStoreAlias);
                 }
                 
-                cc = CredentialConfigFactory.createKeyStoreCredentialConfig(trustStore, trustStoreAliases, keyStore, keyStorePassword, keyStoreAliases);
+                cc = CredentialConfigFactory.createKeyStoreCredentialConfig(trustStore, trustStoreAliases==null?null:trustStoreAliases.toArray(new String[0]), keyStore, keyStorePassword, keyStoreAliases);
 
             }
             
@@ -295,17 +295,17 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             }
        
             //https://github.com/floragunncom/search-guard/issues/227
-            final String[] enabledCipherSuites = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, EMPTY_STRING_ARRAY);   
-            final String[] enabledProtocols = settings.getAsArray(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, new String[] { "TLSv1.1", "TLSv1.2" });   
+            final List<String> enabledCipherSuites = settings.getAsList(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, Collections.emptyList());   
+            final List<String> enabledProtocols = settings.getAsList(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, DEFAULT_TLS_PROTOCOLS);   
             
 
-            if(enabledCipherSuites.length > 0) {
-                sslConfig.setEnabledCipherSuites(enabledCipherSuites);
-                log.debug("enabled ssl cipher suites for ldaps {}", Arrays.toString(enabledCipherSuites));
+            if(enabledCipherSuites.size() > 0) {
+                sslConfig.setEnabledCipherSuites(enabledCipherSuites.toArray(new String[0]));
+                log.debug("enabled ssl cipher suites for ldaps {}", enabledCipherSuites);
             }
             
-            log.debug("enabled ssl/tls protocols for ldaps {}", Arrays.toString(enabledProtocols));
-            sslConfig.setEnabledProtocols(enabledProtocols);
+            log.debug("enabled ssl/tls protocols for ldaps {}", enabledProtocols);
+            sslConfig.setEnabledProtocols(enabledProtocols.toArray(new String[0]));
             config.setSslConfig(sslConfig);
         }
 
@@ -349,8 +349,8 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
             log.trace("dn: {}", dn);
         }
 
-        final String[] skipUsers = settings.getAsArray(ConfigConstants.LDAP_AUTHZ_SKIP_USERS, EMPTY_STRING_ARRAY);
-        if (skipUsers.length > 0 && WildcardMatcher.matchAny(skipUsers, authenticatedUser)) {
+        final List<String> skipUsers = settings.getAsList(ConfigConstants.LDAP_AUTHZ_SKIP_USERS, Collections.emptyList());
+        if (skipUsers.size() > 0 && WildcardMatcher.matchAny(skipUsers, authenticatedUser)) {
             if (log.isDebugEnabled()) {
                 log.debug("Skipped search roles of user {}", authenticatedUser);
             }
@@ -472,7 +472,7 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 log.trace("roles count total {}", roles.size());
             }
             
-            final String[] nestedRoleFilter = settings.getAsArray(ConfigConstants.LDAP_AUTHZ_NESTEDROLEFILTER, EMPTY_STRING_ARRAY);
+            final List<String> nestedRoleFilter = settings.getAsList(ConfigConstants.LDAP_AUTHZ_NESTEDROLEFILTER, Collections.emptyList());
 
             // nested roles
             if (settings.getAsBoolean(ConfigConstants.LDAP_AUTHZ_RESOLVE_NESTED_ROLES, false)) {
@@ -543,10 +543,10 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
     }
 
     protected Set<LdapName> resolveNestedRoles(final LdapName roleDn, final Connection ldapConnection, String userRoleName,
-            int depth, final boolean rolesearchEnabled, final String[] roleFilter)
+            int depth, final boolean rolesearchEnabled, final List<String> roleFilter)
             throws ElasticsearchSecurityException, LdapException {
         
-        if(roleFilter.length > 0  && WildcardMatcher.matchAny(roleFilter, roleDn.toString())) {
+        if(roleFilter.size() > 0  && WildcardMatcher.matchAny(roleFilter, roleDn.toString())) {
             
             if(log.isTraceEnabled()) {
                 log.trace("Filter nested role {}", roleDn);

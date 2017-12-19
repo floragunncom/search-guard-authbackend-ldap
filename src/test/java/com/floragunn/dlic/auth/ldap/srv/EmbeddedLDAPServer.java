@@ -46,7 +46,7 @@ import org.apache.directory.server.ldap.handlers.sasl.plain.PlainMechanismHandle
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.floragunn.dlic.auth.ldap.LdapBackendTest;
+import com.floragunn.searchguard.test.helper.file.FileHelper;
 
 public class EmbeddedLDAPServer {
 
@@ -86,7 +86,7 @@ public class EmbeddedLDAPServer {
         final CreateLdapServer cl = (CreateLdapServer) AnnotationUtils.getInstance(CreateLdapServer.class);
         ldapServer = ServerAnnotationProcessor.instantiateLdapServer(cl, directoryService);
 
-        ldapServer.setKeystoreFile(LdapBackendTest.getAbsoluteFilePathFromClassPath("node-0-keystore.jks").getAbsolutePath());
+        ldapServer.setKeystoreFile(FileHelper.getAbsoluteFilePathFromClassPath("node-0-keystore.jks").toFile().getAbsolutePath());
         ldapServer.setCertificatePassword("changeit");
         
         // ldapServer.setEnabledCipherSuites(Arrays.asList(SecurityUtil.ENABLED_SSL_CIPHERS));
