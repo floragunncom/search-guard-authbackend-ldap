@@ -43,7 +43,7 @@ public class LdapBackendTestClientCert {
         //no auth
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "localhost:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 .put("searchguard.ssl.transport.truststore_filepath", "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/truststore.jks")
@@ -69,7 +69,7 @@ public class LdapBackendTestClientCert {
         //no auth
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "kdc.dummy.com:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "kdc.dummy.com:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 .put("searchguard.ssl.transport.truststore_filepath", "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/truststore.jks")
@@ -96,7 +96,7 @@ public class LdapBackendTestClientCert {
         //no auth
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "kdc.dummy.com:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "kdc.dummy.com:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 .put("searchguard.ssl.transport.truststore_filepath", "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/wrong/truststore.jks")
@@ -126,7 +126,7 @@ public class LdapBackendTestClientCert {
         //bin dn auth
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "localhost:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 .put("searchguard.ssl.transport.truststore_filepath", "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/truststore.jks")
@@ -148,7 +148,7 @@ public class LdapBackendTestClientCert {
     public void testLdapSslAuth() throws Exception {
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "localhost:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 .put("searchguard.ssl.transport.keystore_filepath", "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/spock-keystore.jks")
@@ -171,7 +171,7 @@ public class LdapBackendTestClientCert {
     public void testLdapSslAuthPem() throws Exception {
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "localhost:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 .put(ConfigConstants.LDAPS_PEMTRUSTEDCAS_FILEPATH, "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/ca/root-ca.pem")
@@ -197,7 +197,7 @@ public class LdapBackendTestClientCert {
     public void testLdapSslAuthNo() throws Exception {
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "localhost:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "localhost:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 .put("searchguard.ssl.transport.keystore_filepath", "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/kirk-keystore.jks")
@@ -222,7 +222,7 @@ public class LdapBackendTestClientCert {
         //startLDAPServer();
 
         final Settings settings = Settings.builder()
-                .putArray(ConfigConstants.LDAP_HOSTS, "kdc.dummy.com:636")
+                .putList(ConfigConstants.LDAP_HOSTS, "kdc.dummy.com:636")
                 .put(ConfigConstants.LDAP_AUTHC_USERSEARCH, "(uid={0})")
                 .put(ConfigConstants.LDAPS_ENABLE_SSL, true)
                 //.put("searchguard.ssl.transport.keystore_filepath", "/Users/temp/search-guard-integration-tests/ldap/ssl-root-ca/cn=ldapbinder,ou=people,dc=example,dc=com-keystore.jks")
@@ -235,8 +235,8 @@ public class LdapBackendTestClientCert {
                 //.put(ConfigConstants.LDAP_BIND_DN, "cn=ldapbinder,ou=people,dc=example,dc=com")
                 //.put(ConfigConstants.LDAP_PASSWORD, "ldapbinder")
                 
-                //.putArray(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, "TLS_RSA_WITH_AES_128_CBC_SHA")
-                //.putArray(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, "TLSv1")
+                //.putList(ConfigConstants.LDAPS_ENABLED_SSL_CIPHERS, "TLS_RSA_WITH_AES_128_CBC_SHA")
+                //.putList(ConfigConstants.LDAPS_ENABLED_SSL_PROTOCOLS, "TLSv1")
                 //TLS_RSA_AES_128_CBC_SHA1
                 .put("path.home",".")
                 .build();
