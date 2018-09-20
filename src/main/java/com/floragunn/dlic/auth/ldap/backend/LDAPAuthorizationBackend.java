@@ -759,10 +759,20 @@ public class LDAPAuthorizationBackend implements AuthorizationBackend {
                 }
             }
         }
-
-        for (final LdapName nm : new HashSet<LdapName>(result)) {
-            final Set<LdapName> in = resolveNestedRoles(nm, ldapConnection, userRoleName, depth, rolesearchEnabled, roleFilter);
-            result.addAll(in);
+        
+        
+        int maxDepth = ConfigConstants.LDAP_AUTHZ_MAX_NESTED_DEPTH_DEFAULT;
+        try {
+            maxDepth = settings.getAsInt(ConfigConstants.LDAP_AUTHZ_MAX_NESTED_DEPTH, ConfigConstants.LDAP_AUTHZ_MAX_NESTED_DEPTH_DEFAULT);
+        } catch(Exception e) {
+            log.error(ConfigConstants.LDAP_AUTHZ_MAX_NESTED_DEPTH+" is not parseable: "+e,e);
+        }
+        
+        if(depth < maxDepth) {
+            for (final LdapName nm : new HashSet<LdapName>(result)) {
+                final Set<LdapName> in = resolveNestedRoles(nm, ldapConnection, userRoleName, depth, rolesearchEnabled, roleFilter);
+                result.addAll(in);
+            }
         }
 
         return result;
