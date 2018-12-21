@@ -23,7 +23,7 @@
 
   <groupId>com.floragunn</groupId>
   <artifactId>dlic-search-guard-authbackend-ldap</artifactId>
-  <version>5.0-15-SNAPSHOT</version>
+  <version>5.0-15-550-htf1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <name>Search Guard</name>
@@ -43,9 +43,9 @@
   </distributionManagement>
 
   <properties>
-    <sg2.version>5.6.3-17</sg2.version>
+    <sg2.version>5.5.0-16</sg2.version>
     <apache.ds.version>2.0.0-M21</apache.ds.version>
-    <elasticsearch.version>5.6.3</elasticsearch.version>
+    <elasticsearch.version>5.5.0</elasticsearch.version>
     <dependency.locations.enabled>false</dependency.locations.enabled>
   </properties>
 
@@ -89,7 +89,7 @@
    <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
-      <version>2.9.0</version>
+      <version>2.8.2</version>
       <scope>provided</scope>
     </dependency>
 
@@ -131,7 +131,7 @@
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-slf4j-impl</artifactId>
-      <version>2.9.0</version>
+      <version>2.8.2</version>
       <exclusions>
         <exclusion>
          <groupId>org.apache.logging.log4j</groupId>

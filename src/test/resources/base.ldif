@@ -76,6 +76,7 @@ uniqueMember: cn=Michael Jackson,ou=people,o=TEST
 uniqueMember: cn=Captain Spock,ou=people,o=TEST
 uniqueMember: cn=hnelson,ou=people,o=TEST
 uniqueMember: cn=Special\, Sign,ou=people,o=TEST
+description: ceo-ceo
 
 dn: cn=spec\,group,ou=groups,o=TEST
 objectClass: groupOfUniqueNames
@@ -92,6 +93,7 @@ objectClass: groupOfUniqueNames
 cn: role2
 uniqueMember: cn=Michael Jackson,ou=people,o=TEST
 uniqueMember: cn=nested1,ou=groups,o=TEST
+description: role2-role2
 
 dn: cn=nested1,ou=groups,o=TEST
 objectClass: groupOfUniqueNames
